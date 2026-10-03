@@ -14,6 +14,7 @@ import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Profile from "./pages/seeker/Profile";
+import SavedJobs from "./pages/seeker/SavedJobs";
 
 function PublicLayout({ children }) {
   return (
@@ -155,6 +156,10 @@ export default function App() {
       <Route 
       path="/profile" 
       element={<Profile />} />
+
+      <Route 
+      path="/saved-jobs" 
+      element={<SavedJobs />} />
 
       <Route
         path="*"
