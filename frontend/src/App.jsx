@@ -1,122 +1,160 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Navigate, Route, Routes } from "react-router-dom";
 
-function App() {
-  const [count, setCount] = useState(0)
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import ProtectedRoute from "./components/ProtectedRoute";
 
+import Home from "./pages/Home";
+import Jobs from "./pages/Jobs";
+import JobDetails from "./pages/JobDetails";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+
+import SeekerDashboard from "./pages/seeker/SeekerDashboard";
+import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+
+function PublicLayout({ children }) {
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <Navbar />
+      {children}
+      <Footer />
     </>
-  )
+  );
 }
 
-export default App
+function DashboardLayoutWrapper({ children }) {
+  return (
+    <>
+      <Navbar />
+      {children}
+    </>
+  );
+}
+
+function PlaceholderPage({ title }) {
+  return (
+    <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-20 text-center sm:px-6 lg:px-8">
+      <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#0066b3]">
+        CareerFlow
+      </p>
+
+      <h1 className="mt-3 text-3xl font-black text-[#172b4d]">
+        {title}
+      </h1>
+
+      <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-500">
+        This section is part of the platform and will be connected to
+        the backend modules in the next development phase.
+      </p>
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <PublicLayout>
+            <Home />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/jobs"
+        element={
+          <PublicLayout>
+            <Jobs />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/jobs/:id"
+        element={
+          <PublicLayout>
+            <JobDetails />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/companies"
+        element={
+          <PublicLayout>
+            <PlaceholderPage title="Explore Companies" />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/career-advice"
+        element={
+          <PublicLayout>
+            <PlaceholderPage title="Career Advice" />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/login"
+        element={
+          <PublicLayout>
+            <Login />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/register"
+        element={
+          <PublicLayout>
+            <Register />
+          </PublicLayout>
+        }
+      />
+
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute roles={["JOB_SEEKER"]}>
+            <DashboardLayoutWrapper>
+              <SeekerDashboard />
+            </DashboardLayoutWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/recruiter"
+        element={
+          <ProtectedRoute roles={["RECRUITER"]}>
+            <DashboardLayoutWrapper>
+              <RecruiterDashboard />
+            </DashboardLayoutWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN", "ADMIN"]}>
+            <DashboardLayoutWrapper>
+              <AdminDashboard />
+            </DashboardLayoutWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
+    </Routes>
+  );
+}
