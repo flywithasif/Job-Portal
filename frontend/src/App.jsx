@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import Profile from "./pages/seeker/Profile";
 
 function PublicLayout({ children }) {
   return (
@@ -150,6 +151,10 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route 
+      path="/profile" 
+      element={<Profile />} />
 
       <Route
         path="*"
