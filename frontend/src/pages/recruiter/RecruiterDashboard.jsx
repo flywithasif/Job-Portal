@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   BarChart3,
   BriefcaseBusiness,
+  Building2,
   CalendarDays,
   Eye,
   Plus,
@@ -31,6 +32,11 @@ const navItems = [
     label: "Interviews",
     path: "/recruiter/interviews",
     icon: CalendarDays,
+  },
+  {
+    label: "Company Profile",
+    path: "/recruiter/company-profile",
+    icon: Building2,
   },
 ];
 
@@ -71,6 +77,7 @@ export default function RecruiterDashboard() {
       navItems={navItems}
     >
       <div className="mx-auto max-w-7xl">
+        {/* Dashboard heading */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-sm text-slate-500">
@@ -91,6 +98,7 @@ export default function RecruiterDashboard() {
           </Link>
         </div>
 
+        {/* Dashboard statistics */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ["12", "Active Jobs", BriefcaseBusiness],
@@ -117,6 +125,58 @@ export default function RecruiterDashboard() {
           ))}
         </div>
 
+        {/* Recruiter quick actions */}
+        <section className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Link
+            to="/recruiter/jobs"
+            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-blue-300"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0066b3]">
+              <BriefcaseBusiness size={22} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="font-extrabold text-[#172b4d]">
+                Manage Jobs
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Create, edit and manage job postings.
+              </p>
+            </div>
+
+            <ArrowUpRight
+              size={19}
+              className="text-slate-400 transition-colors group-hover:text-[#0066b3]"
+            />
+          </Link>
+
+          <Link
+            to="/recruiter/company-profile"
+            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-blue-300"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0066b3]">
+              <Building2 size={22} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="font-extrabold text-[#172b4d]">
+                Company Profile
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Update your company details and information.
+              </p>
+            </div>
+
+            <ArrowUpRight
+              size={19}
+              className="text-slate-400 transition-colors group-hover:text-[#0066b3]"
+            />
+          </Link>
+        </section>
+
+        {/* Job performance table */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 p-6">
             <div>

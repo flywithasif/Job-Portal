@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bookmark,
@@ -11,46 +11,28 @@ import {
   Wallet,
 } from "lucide-react";
 import toast from "react-hot-toast";
-
-const initialSavedJobs = [
-  {
-    id: 1,
-    title: "Senior Frontend Developer",
-    company: "TechNova Solutions",
-    location: "Gurugram, Haryana",
-    type: "Full-time",
-    salary: "₹10L - ₹16L",
-    posted: "2 days ago",
-    logo: "TN",
-  },
-  {
-    id: 2,
-    title: "React Developer",
-    company: "DigitalCraft Labs",
-    location: "Remote",
-    type: "Full-time",
-    salary: "₹8L - ₹14L",
-    posted: "4 days ago",
-    logo: "DC",
-  },
-  {
-    id: 3,
-    title: "MERN Stack Developer",
-    company: "CloudPeak Technologies",
-    location: "Noida, Uttar Pradesh",
-    type: "Full-time",
-    salary: "₹7L - ₹12L",
-    posted: "1 week ago",
-    logo: "CP",
-  },
-];
+import {
+  getSavedJobs,
+  saveSavedJobs,
+  subscribeToSeekerData,
+} from "../../data/seekerStorage";
 
 export default function SavedJobs() {
-  const [savedJobs, setSavedJobs] = useState(initialSavedJobs);
+  const [savedJobs, setSavedJobs] = useState(getSavedJobs);
   const [search, setSearch] = useState("");
 
+  // Keep this page synchronized with the shared seeker storage.
+  useEffect(() => {
+    return subscribeToSeekerData(() => {
+      setSavedJobs(getSavedJobs());
+    });
+  }, []);
+
   const removeJob = (id) => {
-    setSavedJobs((prev) => prev.filter((job) => job.id !== id));
+    const updatedJobs = getSavedJobs().filter((job) => job.id !== id);
+
+    saveSavedJobs(updatedJobs);
+    setSavedJobs(updatedJobs);
     toast.success("Job removed from saved jobs");
   };
 
@@ -108,7 +90,6 @@ export default function SavedJobs() {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                   Saved Jobs
                 </p>
-
                 <p className="mt-1 text-2xl font-bold text-slate-900">
                   {savedJobs.length}
                 </p>
@@ -126,7 +107,6 @@ export default function SavedJobs() {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                   Full-time
                 </p>
-
                 <p className="mt-1 text-2xl font-bold text-slate-900">
                   {savedJobs.filter((job) => job.type === "Full-time").length}
                 </p>
@@ -144,7 +124,6 @@ export default function SavedJobs() {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                   Remote
                 </p>
-
                 <p className="mt-1 text-2xl font-bold text-slate-900">
                   {savedJobs.filter((job) => job.location === "Remote").length}
                 </p>
@@ -165,7 +144,7 @@ export default function SavedJobs() {
               type="text"
               placeholder="Search your saved jobs..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
           </div>
@@ -233,9 +212,11 @@ export default function SavedJobs() {
                     </Link>
 
                     <button
+                      type="button"
                       onClick={() => removeJob(job.id)}
                       className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
                       title="Remove saved job"
+                      aria-label={`Remove ${job.title} from saved jobs`}
                     >
                       <Trash2 size={17} />
                     </button>

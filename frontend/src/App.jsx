@@ -9,12 +9,23 @@ import Jobs from "./pages/Jobs";
 import JobDetails from "./pages/JobDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import CompanyDetails from "./pages/CompanyDetails";
+
 
 import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Profile from "./pages/seeker/Profile";
 import SavedJobs from "./pages/seeker/SavedJobs";
+import AppliedJobs from "./pages/seeker/AppliedJobs";
+import ApplicationDetails from "./pages/seeker/ApplicationDetails";
+import Notifications from "./pages/seeker/Notifications";
+import Interviews from "./pages/seeker/Interviews";
+
+import ManageJobs from "./pages/recruiter/ManageJobs";
+import Applicants from "./pages/recruiter/Applicants";
+import CompanyProfile from "./pages/recruiter/CompanyProfile";
+
 
 function PublicLayout({ children }) {
   return (
@@ -160,6 +171,39 @@ export default function App() {
       <Route 
       path="/saved-jobs" 
       element={<SavedJobs />} />
+
+      <Route 
+      path="/applied-jobs" 
+      element={<AppliedJobs />} />
+
+      <Route
+        path="/applications/:id"
+        element={<ApplicationDetails />}
+      />
+
+      <Route 
+      path="/notifications" 
+      element={<Notifications />} />
+
+      <Route 
+      path="/interviews" 
+      element={<Interviews />} />
+
+      <Route 
+      path="/recruiter/jobs" 
+      element={<ManageJobs />} />
+
+      <Route 
+      path="/recruiter/applicants" 
+      element={<Applicants />} />
+
+      <Route
+      path="/recruiter/company-profile"
+      element={<CompanyProfile />} />
+
+      <Route 
+      path="/companies/:id" 
+      element={<CompanyDetails />} />
 
       <Route
         path="*"
