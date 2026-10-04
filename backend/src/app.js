@@ -4,8 +4,10 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
+const jobRoutes = require("./routes/jobRoutes");
 
 const authRoutes = require("./routes/authRoutes");
+const companyRoutes = require("./routes/companyRoutes");
 
 const app = express();
 
@@ -100,7 +102,10 @@ app.get("/api", (req, res) => {
 // ============================================
 
 app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
 
+
+app.use("/api/companies", companyRoutes);
 // ============================================
 // 404
 // ============================================
