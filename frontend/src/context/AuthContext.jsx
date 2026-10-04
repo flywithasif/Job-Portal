@@ -23,6 +23,14 @@ const DEMO_USERS = {
     email: "admin@example.com",
     role: "SUPER_ADMIN",
   },
+
+  // Fix: Support the SUPER_ADMIN value sent by Login.jsx.
+  SUPER_ADMIN: {
+    id: "admin-001",
+    name: "Super Admin",
+    email: "admin@example.com",
+    role: "SUPER_ADMIN",
+  },
 };
 
 export function AuthProvider({ children }) {
@@ -44,18 +52,23 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const login = async ({ email, password, role }) => {
-    if (!email || !password) {
+    if (!email?.trim() || !password) {
       throw new Error("Email and password are required.");
     }
 
-    const selectedRole = role || "JOB_SEEKER";
+    const selectedRole = String(role || "JOB_SEEKER")
+      .trim()
+      .toUpperCase();
 
-    const baseUser =
-      DEMO_USERS[selectedRole] || DEMO_USERS.JOB_SEEKER;
+    const baseUser = DEMO_USERS[selectedRole];
+
+    if (!baseUser) {
+      throw new Error("Invalid account type selected.");
+    }
 
     const loggedInUser = {
       ...baseUser,
-      email,
+      email: email.trim(),
     };
 
     setUser(loggedInUser);
@@ -64,11 +77,19 @@ export function AuthProvider({ children }) {
   };
 
   const register = async ({ name, email, role }) => {
+    const selectedRole = String(role || "JOB_SEEKER")
+      .trim()
+      .toUpperCase();
+
+    if (!["JOB_SEEKER", "RECRUITER"].includes(selectedRole)) {
+      throw new Error("Invalid registration account type.");
+    }
+
     const registeredUser = {
       id: `user-${Date.now()}`,
       name,
       email,
-      role: role || "JOB_SEEKER",
+      role: selectedRole,
     };
 
     setUser(registeredUser);

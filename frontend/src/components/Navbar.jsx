@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   BriefcaseBusiness,
   Menu,
-  Search,
   UserRound,
   X,
 } from "lucide-react";
@@ -17,8 +16,16 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const profilePath =
+    user?.role === "RECRUITER"
+      ? "/recruiter"
+      : user?.role === "SUPER_ADMIN" || user?.role === "ADMIN"
+        ? "/admin"
+        : "/profile";
+
   const handleLogout = () => {
     logout();
+    setMobileOpen(false);
     toast.success("Logged out successfully");
     navigate("/");
   };
@@ -30,10 +37,16 @@ export default function Navbar() {
         : "text-slate-600 hover:text-[#0066b3]"
     }`;
 
+  const closeMobileMenu = () => setMobileOpen(false);
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link
+          to="/"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-2.5"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0066b3] text-white shadow-sm">
             <BriefcaseBusiness size={21} />
           </div>
@@ -68,7 +81,8 @@ export default function Navbar() {
             </NavLink>
           )}
 
-          {user?.role === "SUPER_ADMIN" && (
+          {(user?.role === "SUPER_ADMIN" ||
+            user?.role === "ADMIN") && (
             <NavLink to="/admin" className={navClass}>
               Admin
             </NavLink>
@@ -79,20 +93,15 @@ export default function Navbar() {
           {user ? (
             <>
               <Link
-                to={
-                  user.role === "RECRUITER"
-                    ? "/recruiter"
-                    : user.role === "SUPER_ADMIN"
-                      ? "/admin"
-                      : "/dashboard"
-                }
+                to={profilePath}
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 <UserRound size={17} />
-                {user.name}
+                {user.name || "My Account"}
               </Link>
 
               <button
+                type="button"
                 onClick={handleLogout}
                 className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
@@ -119,9 +128,11 @@ export default function Navbar() {
         </div>
 
         <button
+          type="button"
           onClick={() => setMobileOpen((value) => !value)}
           className="rounded-xl p-2 text-slate-700 md:hidden"
-          aria-label="Toggle menu"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? <X /> : <Menu />}
         </button>
@@ -132,7 +143,7 @@ export default function Navbar() {
           <div className="mx-auto flex max-w-7xl flex-col gap-2">
             <Link
               to="/jobs"
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobileMenu}
               className="rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
             >
               Find Jobs
@@ -140,7 +151,7 @@ export default function Navbar() {
 
             <Link
               to="/companies"
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobileMenu}
               className="rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
             >
               Companies
@@ -148,17 +159,46 @@ export default function Navbar() {
 
             <Link
               to="/career-advice"
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobileMenu}
               className="rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
             >
               Career Advice
             </Link>
 
-            {!user && (
+            {user ? (
+              <>
+                <Link
+                  to={profilePath}
+                  onClick={closeMobileMenu}
+                  className="mt-2 flex items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 font-semibold text-[#0066b3]"
+                >
+                  <UserRound size={18} />
+                  {user.name || "My Account"}
+                </Link>
+
+                {user.role === "JOB_SEEKER" && (
+                  <Link
+                    to="/dashboard"
+                    onClick={closeMobileMenu}
+                    className="rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Dashboard
+                  </Link>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-left font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
               <>
                 <Link
                   to="/login"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={closeMobileMenu}
                   className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-center font-bold text-[#0066b3]"
                 >
                   Login
@@ -166,7 +206,7 @@ export default function Navbar() {
 
                 <Link
                   to="/register"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={closeMobileMenu}
                   className="rounded-xl bg-[#0066b3] px-4 py-3 text-center font-bold text-white"
                 >
                   Register

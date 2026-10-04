@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -11,6 +12,12 @@ import {
   Users,
   X,
 } from "lucide-react";
+
+import {
+  readRecruiterData,
+  writeRecruiterData,
+  RECRUITER_STORAGE_KEYS,
+} from "../../utils/recruiterStorage";
 
 const initialApplicants = [
   {
@@ -89,6 +96,8 @@ const statusOptions = [
   "Hired",
 ];
 
+const filters = ["All", ...statusOptions];
+
 const statusStyles = {
   Applied: "bg-blue-50 text-blue-700",
   Shortlisted: "bg-violet-50 text-violet-700",
@@ -97,18 +106,10 @@ const statusStyles = {
   Hired: "bg-emerald-50 text-emerald-700",
 };
 
-const filters = [
-  "All",
-  "Applied",
-  "Shortlisted",
-  "Interview",
-  "Rejected",
-  "Hired",
-];
-
-function getInitials(name) {
+function getInitials(name = "") {
   return name
     .split(" ")
+    .filter(Boolean)
     .map((part) => part[0])
     .slice(0, 2)
     .join("")
@@ -116,7 +117,13 @@ function getInitials(name) {
 }
 
 function formatDate(dateString) {
-  return new Date(`${dateString}T12:00:00`).toLocaleDateString("en-IN", {
+  if (!dateString) return "—";
+
+  const date = new Date(`${dateString}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -128,6 +135,7 @@ function StatCard({ title, value, icon: Icon, color }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-slate-500">{title}</p>
+
         <span
           className={`flex h-10 w-10 items-center justify-center rounded-xl ${color}`}
         >
@@ -159,6 +167,7 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
             <span className="block font-semibold text-slate-900 hover:text-blue-700">
               {applicant.name}
             </span>
+
             <span className="mt-1 block text-xs text-slate-500">
               {applicant.email}
             </span>
@@ -168,6 +177,7 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 
       <td className="min-w-52 px-5 py-5">
         <p className="font-medium text-slate-800">{applicant.job}</p>
+
         <p className="mt-1 text-xs text-slate-500">
           {applicant.experience} experience
         </p>
@@ -175,7 +185,7 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 
       <td className="min-w-52 px-5 py-5">
         <div className="flex flex-wrap gap-1.5">
-          {applicant.skills.map((skill) => (
+          {(applicant.skills || []).map((skill) => (
             <span
               key={skill}
               className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600"
@@ -192,7 +202,9 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 
       <td className="px-5 py-5">
         <span
-          className={`inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[applicant.status]}`}
+          className={`inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
+            statusStyles[applicant.status] || statusStyles.Applied
+          }`}
         >
           {applicant.status}
         </span>
@@ -230,12 +242,37 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 }
 
 export default function Applicants() {
-  const [applicants, setApplicants] = useState(initialApplicants);
+  const [applicants, setApplicants] = useState(() =>
+    readRecruiterData(
+      RECRUITER_STORAGE_KEYS.applicants,
+      initialApplicants,
+    ),
+  );
+
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("All jobs");
   const [selectedApplicant, setSelectedApplicant] = useState(null);
   const [notice, setNotice] = useState("");
+
+  // Save applicant changes locally.
+  useEffect(() => {
+    writeRecruiterData(
+      RECRUITER_STORAGE_KEYS.applicants,
+      applicants,
+    );
+  }, [applicants]);
+
+  // Clear the success message automatically.
+  useEffect(() => {
+    if (!notice) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setNotice("");
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
 
   const jobOptions = useMemo(
     () => [...new Set(applicants.map((applicant) => applicant.job))],
@@ -251,8 +288,9 @@ export default function Applicants() {
       interviews: applicants.filter(
         (applicant) => applicant.status === "Interview",
       ).length,
-      hired: applicants.filter((applicant) => applicant.status === "Hired")
-        .length,
+      hired: applicants.filter(
+        (applicant) => applicant.status === "Hired",
+      ).length,
     }),
     [applicants],
   );
@@ -262,18 +300,24 @@ export default function Applicants() {
 
     return applicants.filter((applicant) => {
       const matchesStatus =
-        activeFilter === "All" || applicant.status === activeFilter;
+        activeFilter === "All" ||
+        applicant.status === activeFilter;
 
       const matchesJob =
-        jobFilter === "All jobs" || applicant.job === jobFilter;
+        jobFilter === "All jobs" ||
+        applicant.job === jobFilter;
 
-      const matchesSearch = [
-        applicant.name,
-        applicant.email,
-        applicant.job,
-        applicant.experience,
-        ...applicant.skills,
-      ].some((value) => value.toLowerCase().includes(query));
+      const searchableValues = [
+        applicant.name || "",
+        applicant.email || "",
+        applicant.job || "",
+        applicant.experience || "",
+        ...(applicant.skills || []),
+      ];
+
+      const matchesSearch = searchableValues.some((value) =>
+        value.toLowerCase().includes(query),
+      );
 
       return matchesStatus && matchesJob && matchesSearch;
     });
@@ -283,16 +327,18 @@ export default function Applicants() {
     const applicant = applicants.find((item) => item.id === id);
 
     setApplicants((current) =>
-      current.map((item) => (item.id === id ? { ...item, status } : item)),
+      current.map((item) =>
+        item.id === id ? { ...item, status } : item,
+      ),
     );
 
     setSelectedApplicant((current) =>
       current?.id === id ? { ...current, status } : current,
     );
 
-    setNotice(`${applicant?.name ?? "Applicant"} status updated to ${status}.`);
-
-    window.setTimeout(() => setNotice(""), 3000);
+    setNotice(
+      `${applicant?.name ?? "Applicant"} status updated to ${status}.`,
+    );
   }
 
   const statCards = [
@@ -336,8 +382,8 @@ export default function Applicants() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Review candidates, manage application statuses and keep your hiring
-            process organized.
+            Review candidates, manage application statuses and keep
+            your hiring process organized.
           </p>
         </div>
 
@@ -356,6 +402,7 @@ export default function Applicants() {
                 <h2 className="text-lg font-bold text-slate-900">
                   Candidate applications
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
                   {filteredApplicants.length} applicant
                   {filteredApplicants.length !== 1 ? "s" : ""} found
@@ -363,6 +410,7 @@ export default function Applicants() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
+                {/* Search candidates */}
                 <div className="relative">
                   <Search
                     size={17}
@@ -372,12 +420,15 @@ export default function Applicants() {
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) =>
+                      setSearchQuery(event.target.value)
+                    }
                     placeholder="Search candidates..."
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-64"
                   />
                 </div>
 
+                {/* Filter by job */}
                 <div className="relative">
                   <BriefcaseBusiness
                     size={16}
@@ -386,10 +437,13 @@ export default function Applicants() {
 
                   <select
                     value={jobFilter}
-                    onChange={(event) => setJobFilter(event.target.value)}
+                    onChange={(event) =>
+                      setJobFilter(event.target.value)
+                    }
                     className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-64"
                   >
-                    <option>All jobs</option>
+                    <option value="All jobs">All jobs</option>
+
                     {jobOptions.map((job) => (
                       <option key={job} value={job}>
                         {job}
@@ -411,8 +465,9 @@ export default function Applicants() {
                 const count =
                   filter === "All"
                     ? applicants.length
-                    : applicants.filter((item) => item.status === filter)
-                        .length;
+                    : applicants.filter(
+                        (item) => item.status === filter,
+                      ).length;
 
                 return (
                   <button
@@ -421,16 +476,17 @@ export default function Applicants() {
                     onClick={() => setActiveFilter(filter)}
                     className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
                       activeFilter === filter
-                        ? "bg-blue-600 text-white"
-                        : "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
                     }`}
                   >
                     {filter}
+
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-xs ${
                         activeFilter === filter
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-white/15 text-white"
+                          : "bg-white text-slate-500"
                       }`}
                     >
                       {count}
@@ -479,10 +535,15 @@ export default function Applicants() {
             </div>
           ) : (
             <div className="px-5 py-16 text-center">
-              <Users size={30} className="mx-auto text-slate-300" />
+              <Users
+                size={30}
+                className="mx-auto text-slate-300"
+              />
+
               <h3 className="mt-4 font-bold text-slate-900">
                 No applicants found
               </h3>
+
               <p className="mt-2 text-sm text-slate-500">
                 Try changing your search, job selection or status filter.
               </p>
@@ -503,12 +564,12 @@ export default function Applicants() {
         </section>
 
         <p className="mt-4 text-xs leading-5 text-slate-400">
-          Demo data only. Applicant records and status changes are not saved to
-          the backend yet.
+          Demo data only. Applicant records are stored in this
+          browser's localStorage, not in the backend yet.
         </p>
       </div>
 
-      {/* Status update notice */}
+      {/* Status update notification */}
       {notice && (
         <div
           role="status"
@@ -517,6 +578,7 @@ export default function Applicants() {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
             <Check size={17} />
           </span>
+
           {notice}
         </div>
       )}
@@ -542,6 +604,7 @@ export default function Applicants() {
                 <p className="text-xs font-bold tracking-widest text-blue-700">
                   CANDIDATE PROFILE
                 </p>
+
                 <h2
                   id="applicant-details-title"
                   className="mt-2 text-xl font-bold text-slate-900"
@@ -570,11 +633,16 @@ export default function Applicants() {
                   <h3 className="text-lg font-bold text-slate-900">
                     {selectedApplicant.name}
                   </h3>
+
                   <p className="mt-1 break-all text-sm text-slate-500">
                     {selectedApplicant.email}
                   </p>
+
                   <span
-                    className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[selectedApplicant.status]}`}
+                    className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      statusStyles[selectedApplicant.status] ||
+                      statusStyles.Applied
+                    }`}
                   >
                     {selectedApplicant.status}
                   </span>
@@ -586,6 +654,7 @@ export default function Applicants() {
                   <p className="text-xs font-medium text-slate-500">
                     Applied position
                   </p>
+
                   <p className="mt-1 font-semibold text-slate-900">
                     {selectedApplicant.job}
                   </p>
@@ -596,6 +665,7 @@ export default function Applicants() {
                     <p className="text-xs font-medium text-slate-500">
                       Experience
                     </p>
+
                     <p className="mt-1 text-sm font-semibold text-slate-800">
                       {selectedApplicant.experience}
                     </p>
@@ -605,6 +675,7 @@ export default function Applicants() {
                     <p className="text-xs font-medium text-slate-500">
                       Application date
                     </p>
+
                     <p className="mt-1 text-sm font-semibold text-slate-800">
                       {formatDate(selectedApplicant.appliedOn)}
                     </p>
@@ -615,8 +686,9 @@ export default function Applicants() {
                   <p className="text-xs font-medium text-slate-500">
                     Skills
                   </p>
+
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedApplicant.skills.map((skill) => (
+                    {(selectedApplicant.skills || []).map((skill) => (
                       <span
                         key={skill}
                         className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700"
@@ -629,11 +701,16 @@ export default function Applicants() {
 
                 <div className="rounded-xl border border-dashed border-slate-300 p-4">
                   <div className="flex items-center gap-3">
-                    <FileText size={21} className="text-slate-500" />
+                    <FileText
+                      size={21}
+                      className="text-slate-500"
+                    />
+
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-800">
                         Candidate resume
                       </p>
+
                       <p className="mt-1 text-xs text-slate-500">
                         {selectedApplicant.resumeUrl
                           ? "Resume available"

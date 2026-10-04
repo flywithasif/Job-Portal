@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   Edit3,
   MapPin,
@@ -15,6 +15,12 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+
+import {
+  readRecruiterData,
+  writeRecruiterData,
+  RECRUITER_STORAGE_KEYS,
+} from "../../utils/recruiterStorage";
 
 const initialJobs = [
   {
@@ -46,7 +52,7 @@ const initialJobs = [
     openings: "3",
     experience: "1–3 years",
     description:
-      "Develop full-stack applications using React, Node.js, Express and MongoDB. Write maintainable code and work with the product team.",
+      "Develop full-stack applications using React, Node.js, Express and MongoDB.",
     status: "Active",
     applicants: 38,
     posted: "2026-09-28",
@@ -63,7 +69,7 @@ const initialJobs = [
     openings: "2",
     experience: "Fresher",
     description:
-      "Assist in building responsive user interfaces with React, JavaScript, HTML and CSS. Work closely with designers and developers.",
+      "Build responsive user interfaces using React, JavaScript, HTML and CSS.",
     status: "Closed",
     applicants: 16,
     posted: "2026-09-20",
@@ -84,6 +90,23 @@ const emptyJob = {
 };
 
 const filters = ["All", "Active", "Closed"];
+
+const inputClass =
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(`${value}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 function StatusBadge({ status }) {
   const active = status === "Active";
@@ -113,24 +136,64 @@ function FormField({ label, children }) {
   );
 }
 
-const inputClass =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
+function StatCard({ label, value, icon: Icon, color }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium leading-5 text-slate-500 sm:text-sm">
+          {label}
+        </p>
+
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}
+        >
+          <Icon size={18} />
+        </span>
+      </div>
+
+      <p className="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export default function ManageJobs() {
-  const [jobs, setJobs] = useState(initialJobs);
+  const [jobs, setJobs] = useState(() =>
+    readRecruiterData(RECRUITER_STORAGE_KEYS.jobs, initialJobs),
+  );
+
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingJobId, setEditingJobId] = useState(null);
-  const [form, setForm] = useState(emptyJob);
+  const [form, setForm] = useState({ ...emptyJob });
   const [formError, setFormError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // Persist job changes in this browser.
+  useEffect(() => {
+    writeRecruiterData(RECRUITER_STORAGE_KEYS.jobs, jobs);
+  }, [jobs]);
+
+  // Automatically clear success messages.
+  useEffect(() => {
+    if (!notice) return undefined;
+
+    const timeoutId = window.setTimeout(() => setNotice(""), 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
 
   const stats = useMemo(
     () => ({
       total: jobs.length,
       active: jobs.filter((job) => job.status === "Active").length,
       closed: jobs.filter((job) => job.status === "Closed").length,
-      applicants: jobs.reduce((sum, job) => sum + job.applicants, 0),
+      applicants: jobs.reduce(
+        (sum, job) => sum + (Number(job.applicants) || 0),
+        0,
+      ),
     }),
     [jobs],
   );
@@ -143,114 +206,15 @@ export default function ManageJobs() {
         activeFilter === "All" || job.status === activeFilter;
 
       const matchesSearch = [
-        job.title,
-        job.department,
-        job.location,
-        job.type,
+        job.title || "",
+        job.department || "",
+        job.location || "",
+        job.type || "",
       ].some((value) => value.toLowerCase().includes(query));
 
       return matchesFilter && matchesSearch;
     });
   }, [jobs, activeFilter, searchQuery]);
-
-  function openCreateModal() {
-    setEditingJobId(null);
-    setForm({ ...emptyJob });
-    setFormError("");
-    setModalOpen(true);
-  }
-
-  function openEditModal(job) {
-    setEditingJobId(job.id);
-    setForm({
-      title: job.title,
-      department: job.department,
-      location: job.location,
-      type: job.type,
-      workplace: job.workplace,
-      salaryMin: job.salaryMin,
-      salaryMax: job.salaryMax,
-      openings: job.openings,
-      experience: job.experience,
-      description: job.description,
-    });
-    setFormError("");
-    setModalOpen(true);
-  }
-
-  function updateField(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault();
-    setFormError("");
-
-    if (
-      !form.title.trim() ||
-      !form.location.trim() ||
-      !form.description.trim()
-    ) {
-      setFormError("Please fill in the job title, location and description.");
-      return;
-    }
-
-    if (
-      Number(form.salaryMin) < 0 ||
-      Number(form.salaryMax) < 0 ||
-      Number(form.salaryMax) < Number(form.salaryMin)
-    ) {
-      setFormError("Please enter a valid salary range.");
-      return;
-    }
-
-    if (!Number.isInteger(Number(form.openings)) || Number(form.openings) < 1) {
-      setFormError("Number of openings must be at least 1.");
-      return;
-    }
-
-    if (editingJobId !== null) {
-      setJobs((current) =>
-        current.map((job) =>
-          job.id === editingJobId ? { ...job, ...form } : job,
-        ),
-      );
-    } else {
-      setJobs((current) => [
-        {
-          ...form,
-          id: Date.now(),
-          status: "Active",
-          applicants: 0,
-          posted: new Date().toISOString().slice(0, 10),
-        },
-        ...current,
-      ]);
-    }
-
-    setModalOpen(false);
-  }
-
-  function toggleJobStatus(id) {
-    setJobs((current) =>
-      current.map((job) =>
-        job.id === id
-          ? { ...job, status: job.status === "Active" ? "Closed" : "Active" }
-          : job,
-      ),
-    );
-  }
-
-  function deleteJob(id) {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this job?",
-    );
-
-    if (!confirmed) return;
-
-    setJobs((current) => current.filter((job) => job.id !== id));
-  }
 
   const statCards = [
     {
@@ -279,10 +243,147 @@ export default function ManageJobs() {
     },
   ];
 
+  function openCreateModal() {
+    setEditingJobId(null);
+    setForm({ ...emptyJob });
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  function openEditModal(job) {
+    setEditingJobId(job.id);
+
+    setForm({
+      title: job.title || "",
+      department: job.department || "Engineering",
+      location: job.location || "",
+      type: job.type || "Full-time",
+      workplace: job.workplace || "Hybrid",
+      salaryMin: job.salaryMin ?? "",
+      salaryMax: job.salaryMax ?? "",
+      openings: String(job.openings ?? "1"),
+      experience: job.experience || "0–2 years",
+      description: job.description || "",
+    });
+
+    setFormError("");
+    setModalOpen(true);
+  }
+
+  function updateField(event) {
+    const { name, value } = event.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    setFormError("");
+
+    if (
+      !form.title.trim() ||
+      !form.location.trim() ||
+      !form.description.trim()
+    ) {
+      setFormError(
+        "Please fill in the job title, location and description.",
+      );
+      return;
+    }
+
+    const minSalary =
+      form.salaryMin === "" ? null : Number(form.salaryMin);
+
+    const maxSalary =
+      form.salaryMax === "" ? null : Number(form.salaryMax);
+
+    if (
+      (minSalary !== null &&
+        (!Number.isFinite(minSalary) || minSalary < 0)) ||
+      (maxSalary !== null &&
+        (!Number.isFinite(maxSalary) || maxSalary < 0)) ||
+      (minSalary !== null &&
+        maxSalary !== null &&
+        maxSalary < minSalary)
+    ) {
+      setFormError("Please enter a valid salary range.");
+      return;
+    }
+
+    const openings = Number(form.openings);
+
+    if (!Number.isInteger(openings) || openings < 1) {
+      setFormError("Number of openings must be at least 1.");
+      return;
+    }
+
+    const cleanJob = {
+      ...form,
+      title: form.title.trim(),
+      location: form.location.trim(),
+      description: form.description.trim(),
+      openings: String(openings),
+    };
+
+    if (editingJobId !== null) {
+      setJobs((current) =>
+        current.map((job) =>
+          job.id === editingJobId ? { ...job, ...cleanJob } : job,
+        ),
+      );
+
+      setNotice("Job posting updated successfully.");
+    } else {
+      setJobs((current) => [
+        {
+          ...cleanJob,
+          id: Date.now(),
+          status: "Active",
+          applicants: 0,
+          posted: new Date().toISOString().slice(0, 10),
+        },
+        ...current,
+      ]);
+
+      setNotice("Job posting created successfully.");
+    }
+
+    setModalOpen(false);
+  }
+
+  function toggleJobStatus(id) {
+    setJobs((current) =>
+      current.map((job) =>
+        job.id === id
+          ? {
+              ...job,
+              status: job.status === "Active" ? "Closed" : "Active",
+            }
+          : job,
+      ),
+    );
+
+    setNotice("Job status updated successfully.");
+  }
+
+  function deleteJob(id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this job posting?",
+    );
+
+    if (!confirmed) return;
+
+    setJobs((current) => current.filter((job) => job.id !== id));
+    setNotice("Job posting deleted successfully.");
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-7 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* Header */}
+        {/* Page header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
@@ -316,235 +417,228 @@ export default function ManageJobs() {
           </button>
         </div>
 
+        {/* Success notification */}
+        {notice && (
+          <div
+            role="status"
+            className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+          >
+            {notice}
+          </div>
+        )}
+
         {/* Statistics */}
         <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {statCards.map((stat) => {
-            const Icon = stat.icon;
+          {statCards.map((stat) => (
+            <StatCard key={stat.label} {...stat} />
+          ))}
+        </section>
 
-            return (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium leading-5 text-slate-500 sm:text-sm">
-                    {stat.label}
-                  </p>
+        {/* Job listings */}
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 p-4 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Your job listings
+                </h2>
 
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${stat.color}`}
-                  >
-                    <Icon size={18} />
-                  </span>
-                </div>
-
-                <p className="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">
-                  {stat.value}
+                <p className="mt-1 text-sm text-slate-500">
+                  {filteredJobs.length} listing
+                  {filteredJobs.length !== 1 ? "s" : ""} found
                 </p>
               </div>
-            );
-          })}
-        </section>
 
-        {/* Jobs list */}
-        <section className="mt-8">
-          <div className="rounded-2xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 p-4 sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    Your job listings
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {filteredJobs.length} listing
-                    {filteredJobs.length !== 1 ? "s" : ""} found
-                  </p>
-                </div>
+              <div className="relative w-full lg:max-w-sm">
+                <Search
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
 
-                <div className="relative w-full lg:max-w-sm">
-                  <Search
-                    size={18}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search jobs, department or location..."
-                    className={`${inputClass} pl-10`}
-                  />
-                </div>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search jobs, department or location..."
+                  className={`${inputClass} pl-10`}
+                />
               </div>
+            </div>
 
-              <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-                {filters.map((filter) => {
-                  const count =
-                    filter === "All"
-                      ? jobs.length
-                      : jobs.filter((job) => job.status === filter).length;
+            <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+              {filters.map((filter) => {
+                const count =
+                  filter === "All"
+                    ? jobs.length
+                    : jobs.filter((job) => job.status === filter).length;
 
-                  return (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setActiveFilter(filter)}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setActiveFilter(filter)}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                      activeFilter === filter
+                        ? "bg-blue-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+                    }`}
+                  >
+                    {filter}
+
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-xs ${
                         activeFilter === filter
-                          ? "bg-blue-600 text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {filter}
-                      <span
-                        className={`rounded-md px-1.5 py-0.5 text-xs ${
-                          activeFilter === filter
-                            ? "bg-white/20 text-white"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {filteredJobs.length > 0 ? (
-                filteredJobs.map((job) => (
-                  <article
-                    key={job.id}
-                    className="p-4 transition hover:bg-slate-50/70 sm:p-6"
-                  >
-                    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="flex min-w-0 gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700">
-                          <BriefcaseBusiness size={22} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-bold text-slate-900 sm:text-lg">
-                              {job.title}
-                            </h3>
-                            <StatusBadge status={job.status} />
-                          </div>
-
-                          <p className="mt-1 text-sm font-medium text-slate-500">
-                            {job.department}
-                          </p>
-
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500">
-                            <span className="inline-flex items-center gap-1.5">
-                              <MapPin size={15} />
-                              {job.location}
-                            </span>
-
-                            <span className="inline-flex items-center gap-1.5">
-                              <BriefcaseBusiness size={15} />
-                              {job.type}
-                            </span>
-
-                            <span className="inline-flex items-center gap-1.5">
-                              <Users size={15} />
-                              {job.applicants} applicants
-                            </span>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                              {job.experience}
-                            </span>
-
-                            <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                              {job.workplace}
-                            </span>
-
-                            <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                              {job.openings} opening
-                              {Number(job.openings) !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-
-                          <p className="mt-4 text-xs text-slate-400">
-                            Posted on {job.posted}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 xl:shrink-0 xl:border-0 xl:pt-0">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(job)}
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-700"
-                        >
-                          <Edit3 size={15} />
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => toggleJobStatus(job.id)}
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-700"
-                        >
-                          {job.status === "Active" ? (
-                            <>
-                              <ChevronDown size={15} />
-                              Close job
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 size={15} />
-                              Reopen job
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => deleteJob(job.id)}
-                          aria-label={`Delete ${job.title}`}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-600 transition hover:bg-red-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="px-5 py-16 text-center">
-                  <BriefcaseBusiness
-                    size={30}
-                    className="mx-auto text-slate-300"
-                  />
-                  <h3 className="mt-4 font-bold text-slate-900">
-                    No job listings found
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Try another search or create a new job posting.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveFilter("All");
-                      setSearchQuery("");
-                    }}
-                    className="mt-4 text-sm font-semibold text-blue-700 hover:text-blue-800"
-                  >
-                    Clear filters
+                      {count}
+                    </span>
                   </button>
-                </div>
-              )}
+                );
+              })}
             </div>
           </div>
+
+          <div className="divide-y divide-slate-100">
+            {filteredJobs.length > 0 ? (
+              filteredJobs.map((job) => (
+                <article
+                  key={job.id}
+                  className="p-4 transition hover:bg-slate-50/70 sm:p-6"
+                >
+                  <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex min-w-0 gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                        <BriefcaseBusiness size={21} />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-bold text-slate-900">
+                            {job.title}
+                          </h3>
+
+                          <StatusBadge status={job.status} />
+                        </div>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          {job.department} · {job.type} · {job.workplace}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+                          <span className="inline-flex items-center gap-1.5">
+                            <MapPin size={14} />
+                            {job.location}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5">
+                            <Users size={14} />
+                            {job.applicants || 0} applicants
+                          </span>
+
+                          <span>
+                            {job.experience || "Experience not specified"}
+                          </span>
+
+                          <span>Posted {formatDate(job.posted)}</span>
+                        </div>
+
+                        {(job.salaryMin || job.salaryMax) && (
+                          <p className="mt-3 text-sm font-semibold text-slate-800">
+                            ₹{job.salaryMin || "—"}–{job.salaryMax || "—"} LPA
+                          </p>
+                        )}
+
+                        {job.description && (
+                          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+                            {job.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(job)}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <Edit3 size={15} />
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleJobStatus(job.id)}
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition ${
+                          job.status === "Active"
+                            ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        }`}
+                      >
+                        {job.status === "Active" ? (
+                          <>
+                            <XCircle size={15} />
+                            Close job
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={15} />
+                            Reopen job
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteJob(job.id)}
+                        aria-label={`Delete ${job.title}`}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-600 transition hover:bg-red-50"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="px-5 py-16 text-center">
+                <BriefcaseBusiness
+                  size={30}
+                  className="mx-auto text-slate-300"
+                />
+
+                <h3 className="mt-4 font-bold text-slate-900">
+                  No job listings found
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Try another search or create a new job posting.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter("All");
+                    setSearchQuery("");
+                  }}
+                  className="mt-4 text-sm font-semibold text-blue-700 hover:text-blue-800"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
         </section>
+
+        <p className="mt-4 text-xs leading-5 text-slate-400">
+          Demo data is stored in this browser's localStorage. Job
+          postings are not yet connected to the backend API.
+        </p>
       </div>
 
-      {/* Create / Edit job modal */}
+      {/* Create and edit job modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6"
@@ -566,8 +660,11 @@ export default function ManageJobs() {
                   id="job-modal-title"
                   className="text-xl font-bold text-slate-900"
                 >
-                  {editingJobId !== null ? "Edit job posting" : "Post a new job"}
+                  {editingJobId !== null
+                    ? "Edit job posting"
+                    : "Post a new job"}
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
                   Enter the job details below.
                 </p>

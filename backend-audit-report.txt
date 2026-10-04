@@ -1,0 +1,697 @@
+﻿JOB PORTAL BACKEND AUDIT
+Generated: 10/04/2026 11:46:24
+Project: C:\Users\Asif\job-portal
+
+SECURITY: .env files and secrets are not included.
+
+===== ROOT FOLDERS AND FILES =====
+[DIR]  backend
+[DIR]  frontend
+
+===== BACKEND CANDIDATE FOLDERS =====
+
+===== FOLDER: backend =====
+--- FILE TREE ---
+.env.example
+package.json
+package-lock.json
+server.js
+src\app.js
+src\config\db.js
+src\controllers\authController.js
+src\middleware\authMiddleware.js
+src\models\User.js
+src\routes\authRoutes.js
+src\utils\generateToken.js
+
+--- FILE CONTENTS ---
+
+========== .env.example ==========
+PORT=5000
+
+NODE_ENV=development
+
+MONGO_URI=mongodb://127.0.0.1:27017/job_portal
+
+CLIENT_URL=http://localhost:5173
+
+JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRES_IN=1d
+
+========== package.json ==========
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+  "dev": "nodemon server.js",
+  "start": "node server.js"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "express-validator": "^7.3.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.10.3",
+    "morgan": "^1.12.1",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
+
+
+========== server.js ==========
+require("dotenv").config();
+
+const app = require("./src/app");
+const connectDB = require("./src/config/db");
+
+const PORT = process.env.PORT || 5000;
+
+const startServer = async () => {
+  try {
+    // Connect MongoDB
+    await connectDB();
+
+    // Start Express server
+    app.listen(PORT, () => {
+      console.log(`
+========================================
+        JOB PORTAL API SERVER
+========================================
+Server:      http://localhost:${PORT}
+API:         http://localhost:${PORT}/api
+Health:      http://localhost:${PORT}/api/health
+Environment: ${process.env.NODE_ENV}
+========================================
+      `);
+    });
+  } catch (error) {
+    console.error(
+      "Server startup failed:",
+      error.message
+    );
+
+    process.exit(1);
+  }
+};
+
+startServer();
+
+========== src\app.js ==========
+const express = require("express");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+
+const authRoutes = require("./routes/authRoutes");
+
+const app = express();
+
+// ============================================
+// SECURITY
+// ============================================
+
+app.use(helmet());
+
+// ============================================
+// CORS
+// ============================================
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+  })
+);
+
+// ============================================
+// RATE LIMIT
+// ============================================
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many requests. Please try again later.",
+  },
+});
+
+app.use("/api", apiLimiter);
+
+// ============================================
+// BODY PARSER
+// ============================================
+
+app.use(express.json({ limit: "10mb" }));
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  })
+);
+
+// ============================================
+// COOKIE
+// ============================================
+
+app.use(cookieParser());
+
+// ============================================
+// LOGGER
+// ============================================
+
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+
+// ============================================
+// HEALTH
+// ============================================
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Job Portal API is running",
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================
+// API ROOT
+// ============================================
+
+app.get("/api", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Welcome to Job Portal API",
+    version: "1.0.0",
+  });
+});
+
+// ============================================
+// AUTH ROUTES
+// ============================================
+
+app.use("/api/auth", authRoutes);
+
+// ============================================
+// 404
+// ============================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// ============================================
+// GLOBAL ERROR HANDLER
+// ============================================
+
+app.use((err, req, res, next) => {
+  console.error("ERROR:", err);
+
+  const statusCode = err.statusCode || 500;
+
+  res.status(statusCode).json({
+    success: false,
+    message:
+      err.message || "Internal server error",
+  });
+});
+
+module.exports = app;
+
+
+========== src\config\db.js ==========
+const mongoose = require("mongoose");
+
+const connectDB = async () => {
+  try {
+    const connection = await mongoose.connect(process.env.MONGO_URI);
+
+    console.log(
+      `MongoDB connected: ${connection.connection.host}`
+    );
+  } catch (error) {
+    console.error("MongoDB connection failed:", error.message);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+
+========== src\controllers\authController.js ==========
+const User = require("../models/User");
+const generateToken = require("../utils/generateToken");
+
+// ============================================
+// REGISTER
+// ============================================
+
+const register = async (req, res, next) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      phone,
+      role,
+    } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required.",
+      });
+    }
+
+    // Check existing user
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists.",
+      });
+    }
+
+    /*
+      IMPORTANT:
+      Public registration can only create
+      JOB_SEEKER or RECRUITER.
+
+      ADMIN/SUPER_ADMIN cannot be created
+      through public registration.
+    */
+
+    const allowedRole =
+      role === "RECRUITER"
+        ? "RECRUITER"
+        : "JOB_SEEKER";
+
+    // Create user
+    const user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      password,
+      phone: phone || "",
+      role: allowedRole,
+    });
+
+    // Generate JWT
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      success: true,
+      message: "Registration successful.",
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          profilePhoto: user.profilePhoto,
+          isEmailVerified: user.isEmailVerified,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================
+// LOGIN
+// ============================================
+
+const login = async (req, res, next) => {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
+    }
+
+    // Password is select:false in model,
+    // so explicitly select it here.
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    }).select("+password");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated.",
+      });
+    }
+
+    // Compare password
+    const isPasswordCorrect =
+      await user.comparePassword(password);
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Update login time
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful.",
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          profilePhoto: user.profilePhoto,
+          isEmailVerified: user.isEmailVerified,
+          lastLoginAt: user.lastLoginAt,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================
+// GET CURRENT USER
+// ============================================
+
+const getMe = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        user: req.user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  getMe,
+};
+
+
+========== src\middleware\authMiddleware.js ==========
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+
+const protect = async (req, res, next) => {
+  try {
+    let token;
+
+    // Read Bearer token
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer ")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please login.",
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    );
+
+    // Find user
+    const user = await User.findById(decoded.userId).select(
+      "-password"
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User no longer exists.",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated.",
+      });
+    }
+
+    // Attach user to request
+    req.user = user;
+
+    next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token has expired. Please login again.",
+      });
+    }
+
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication token.",
+      });
+    }
+
+    next(error);
+  }
+};
+
+// Role based authorization
+const authorize = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access this resource.",
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = {
+  protect,
+  authorize,
+};
+
+
+========== src\models\User.js ==========
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+      minlength: [2, "Name must be at least 2 characters"],
+      maxlength: [100, "Name cannot exceed 100 characters"],
+    },
+
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+      match: [
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        "Please enter a valid email address",
+      ],
+    },
+
+    password: {
+      type: String,
+      required: [true, "Password is required"],
+      minlength: [8, "Password must be at least 8 characters"],
+      select: false,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    role: {
+      type: String,
+      enum: [
+        "JOB_SEEKER",
+        "RECRUITER",
+        "ADMIN",
+        "SUPER_ADMIN",
+      ],
+      default: "JOB_SEEKER",
+      index: true,
+    },
+
+    profilePhoto: {
+      type: String,
+      default: "",
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
+
+  const salt = await bcrypt.genSalt(12);
+
+  this.password = await bcrypt.hash(
+    this.password,
+    salt
+  );
+
+  next();
+});
+
+// Compare password during login
+userSchema.methods.comparePassword = async function (
+  candidatePassword
+) {
+  return bcrypt.compare(
+    candidatePassword,
+    this.password
+  );
+};
+
+module.exports = mongoose.model("User", userSchema);
+
+========== src\routes\authRoutes.js ==========
+const express = require("express");
+
+const {
+  register,
+  login,
+  getMe,
+} = require("../controllers/authController");
+
+const {
+  protect,
+} = require("../middleware/authMiddleware");
+
+const router = express.Router();
+
+// Public routes
+router.post("/register", register);
+router.post("/login", login);
+
+// Protected route
+router.get("/me", protect, getMe);
+
+module.exports = router;
+
+
+========== src\utils\generateToken.js ==========
+const jwt = require("jsonwebtoken");
+
+const generateToken = (userId) => {
+  return jwt.sign(
+    {
+      userId,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    }
+  );
+};
+
+module.exports = generateToken;
+

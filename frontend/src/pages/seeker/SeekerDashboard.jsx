@@ -26,17 +26,17 @@ const navItems = [
   },
   {
     label: "Applications",
-    path: "/dashboard/applications",
+    path: "/applied-jobs",
     icon: FileText,
   },
   {
     label: "Saved Jobs",
-    path: "/dashboard/saved",
+    path: "/saved-jobs",
     icon: Bookmark,
   },
   {
     label: "Interviews",
-    path: "/dashboard/interviews",
+    path: "/interviews",
     icon: CalendarDays,
   },
 ];

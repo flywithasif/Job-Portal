@@ -5,7 +5,6 @@ import {
   LogOut,
   Menu,
   UserRound,
-  X,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -77,23 +76,33 @@ export default function DashboardLayout({
       </div>
 
       <div className="border-t border-white/10 p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+        <Link
+          to="/profile"
+          onClick={() => setMobileOpen(false)}
+          aria-label="View and edit profile"
+          className={`flex items-center gap-3 rounded-xl p-3 transition ${
+            location.pathname === "/profile"
+              ? "bg-[#0066b3]"
+              : "bg-white/5 hover:bg-white/10"
+          }`}
+        >
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/20 text-blue-300">
             <UserRound size={17} />
           </div>
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold">
-              {user?.name}
+              {user?.name || "Your Profile"}
             </p>
 
             <p className="truncate text-xs text-slate-400">
-              {user?.role}
+              {user?.role || "JOB_SEEKER"}
             </p>
           </div>
-        </div>
+        </Link>
 
         <button
+          type="button"
           onClick={handleLogout}
           className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white"
         >
@@ -113,8 +122,10 @@ export default function DashboardLayout({
 
         {mobileOpen && (
           <div className="fixed inset-0 top-[72px] z-50 lg:hidden">
-            <div
-              className="absolute inset-0 bg-black/30"
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="absolute inset-0 h-full w-full bg-black/30"
               onClick={() => setMobileOpen(false)}
             />
 
@@ -129,6 +140,8 @@ export default function DashboardLayout({
             <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               <div className="flex items-center gap-3">
                 <button
+                  type="button"
+                  aria-label="Open navigation"
                   onClick={() => setMobileOpen(true)}
                   className="rounded-lg p-2 text-slate-600 lg:hidden"
                 >
@@ -142,8 +155,14 @@ export default function DashboardLayout({
                 </div>
               </div>
 
-              <button className="relative rounded-xl p-2 text-slate-500 hover:bg-slate-50">
+              <button
+                type="button"
+                aria-label="View notifications"
+                onClick={() => navigate("/notifications")}
+                className="relative rounded-xl p-2 text-slate-500 transition hover:bg-slate-50 hover:text-[#0066b3]"
+              >
                 <Bell size={19} />
+
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
               </button>
             </div>

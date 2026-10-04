@@ -1,18 +1,37 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({
-  children,
-  roles,
-}) {
+export default function ProtectedRoute({ children, roles }) {
   const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Redirect unauthenticated users to login.
+  if (!isAuthenticated || !user) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
+  // Restrict access according to the user's role.
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    const homeByRole = {
+      JOB_SEEKER: "/dashboard",
+      RECRUITER: "/recruiter",
+      ADMIN: "/admin",
+      SUPER_ADMIN: "/admin",
+    };
+
+    return (
+      <Navigate
+        to={homeByRole[user.role] || "/"}
+        replace
+      />
+    );
   }
 
   return children;

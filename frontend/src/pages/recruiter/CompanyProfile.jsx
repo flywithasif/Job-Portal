@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-
 import {
   Building2,
   CheckCircle2,
@@ -10,6 +9,11 @@ import {
   Upload,
 } from "lucide-react";
 
+import {
+  readRecruiterData,
+  writeRecruiterData,
+  RECRUITER_STORAGE_KEYS,
+} from "../../utils/recruiterStorage";
 
 const initialProfile = {
   name: "TechNova Solutions",
@@ -50,10 +54,20 @@ const companySizes = [
 const fieldClass =
   "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
 
-function Field({ label, name, value, onChange, placeholder, type = "text" }) {
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-700">
+        {label}
+      </span>
+
       <input
         type={type}
         name={name}
@@ -67,16 +81,36 @@ function Field({ label, name, value, onChange, placeholder, type = "text" }) {
 }
 
 export default function CompanyProfile() {
-  const [profile, setProfile] = useState(initialProfile);
+  const [profile, setProfile] = useState(() =>
+    readRecruiterData(
+      RECRUITER_STORAGE_KEYS.companyProfile,
+      initialProfile,
+    ),
+  );
+
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState({});
+  const [logoError, setLogoError] = useState(false);
 
   function handleChange(event) {
     const { name, value } = event.target;
 
-    setProfile((current) => ({ ...current, [name]: value }));
+    setProfile((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
     setSaved(false);
-    setErrors((current) => ({ ...current, [name]: "" }));
+
+    setErrors((current) => ({
+      ...current,
+      [name]: "",
+      form: "",
+    }));
+
+    if (name === "logoUrl") {
+      setLogoError(false);
+    }
   }
 
   function handleSubmit(event) {
@@ -92,7 +126,8 @@ export default function CompanyProfile() {
       profile.website.trim() &&
       !/^https?:\/\/.+\..+/i.test(profile.website.trim())
     ) {
-      nextErrors.website = "Enter a valid website URL, including https://.";
+      nextErrors.website =
+        "Enter a valid website URL, including https://.";
     }
 
     if (
@@ -116,6 +151,22 @@ export default function CompanyProfile() {
       return;
     }
 
+    const persisted = writeRecruiterData(
+      RECRUITER_STORAGE_KEYS.companyProfile,
+      profile,
+    );
+
+    if (!persisted) {
+      setSaved(false);
+
+      setErrors((current) => ({
+        ...current,
+        form: "Could not save in this browser. Check storage settings and try again.",
+      }));
+
+      return;
+    }
+
     setSaved(true);
   }
 
@@ -126,6 +177,14 @@ export default function CompanyProfile() {
     .map((word) => word[0])
     .join("")
     .toUpperCase();
+
+  const checklist = [
+    ["Company name", Boolean(profile.name.trim())],
+    ["Website", Boolean(profile.website.trim())],
+    ["Location", Boolean(profile.location.trim())],
+    ["Description", Boolean(profile.description.trim())],
+    ["Contact email", Boolean(profile.email.trim())],
+  ];
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-7 sm:px-6 lg:px-8">
@@ -142,8 +201,8 @@ export default function CompanyProfile() {
             </h1>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 sm:text-base">
-              Introduce your company to candidates and build trust with a
-              complete, professional profile.
+              Introduce your company to candidates and build trust
+              with a complete, professional profile.
             </p>
           </div>
 
@@ -161,14 +220,12 @@ export default function CompanyProfile() {
             <div className="-mt-11 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex items-end gap-4">
                 <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-50 text-2xl font-bold text-blue-700 shadow-sm sm:h-24 sm:w-24">
-                  {profile.logoUrl ? (
+                  {profile.logoUrl && !logoError ? (
                     <img
                       src={profile.logoUrl}
                       alt={`${profile.name} logo`}
                       className="h-full w-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
+                      onError={() => setLogoError(true)}
                     />
                   ) : (
                     initials || <Building2 size={30} />
@@ -193,7 +250,8 @@ export default function CompanyProfile() {
             </div>
 
             <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-600">
-              {profile.tagline || "Add a short tagline for your company."}
+              {profile.tagline ||
+                "Add a short tagline for your company."}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
@@ -202,7 +260,7 @@ export default function CompanyProfile() {
                 {profile.location || "Company location"}
               </span>
 
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 break-all">
                 <Globe size={15} />
                 {profile.website || "Company website"}
               </span>
@@ -220,6 +278,7 @@ export default function CompanyProfile() {
                   <h2 className="text-lg font-bold text-slate-900">
                     Basic information
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     The essential details candidates see about your company.
                   </p>
@@ -234,6 +293,7 @@ export default function CompanyProfile() {
                       onChange={handleChange}
                       placeholder="Your company name"
                     />
+
                     {errors.name && (
                       <p className="mt-1.5 text-xs text-red-600">
                         {errors.name}
@@ -245,6 +305,7 @@ export default function CompanyProfile() {
                     <span className="text-sm font-semibold text-slate-700">
                       Industry
                     </span>
+
                     <select
                       name="industry"
                       value={profile.industry}
@@ -278,6 +339,7 @@ export default function CompanyProfile() {
                       placeholder="https://yourcompany.com"
                       type="url"
                     />
+
                     {errors.website && (
                       <p className="mt-1.5 text-xs text-red-600">
                         {errors.website}
@@ -291,7 +353,7 @@ export default function CompanyProfile() {
                       name="location"
                       value={profile.location}
                       onChange={handleChange}
-                      placeholder="City, state, country"
+                      placeholder="City, State, Country"
                     />
                   </div>
                 </div>
@@ -303,6 +365,7 @@ export default function CompanyProfile() {
                   <h2 className="text-lg font-bold text-slate-900">
                     About the company
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Explain your mission, products and work culture.
                   </p>
@@ -335,6 +398,7 @@ export default function CompanyProfile() {
                   <h2 className="text-lg font-bold text-slate-900">
                     Company details
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Help candidates understand your organization.
                   </p>
@@ -345,6 +409,7 @@ export default function CompanyProfile() {
                     <span className="text-sm font-semibold text-slate-700">
                       Company size
                     </span>
+
                     <select
                       name="size"
                       value={profile.size}
@@ -386,6 +451,7 @@ export default function CompanyProfile() {
                   <h2 className="text-lg font-bold text-slate-900">
                     Online presence
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     Add links where candidates can learn more about you.
                   </p>
@@ -394,7 +460,9 @@ export default function CompanyProfile() {
                 <div className="mt-5">
                   <label className="block">
                     <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                      <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-700 text-xs font-bold text-white">in</span>
+                      <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-700 text-xs font-bold text-white">
+                        in
+                      </span>
                       LinkedIn company URL
                     </span>
 
@@ -420,7 +488,9 @@ export default function CompanyProfile() {
             {/* Sidebar */}
             <aside className="space-y-6">
               <section className="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 className="font-bold text-slate-900">Company logo</h2>
+                <h2 className="font-bold text-slate-900">
+                  Company logo
+                </h2>
 
                 <p className="mt-1 text-sm leading-6 text-slate-500">
                   Paste a publicly accessible image URL to preview your logo.
@@ -430,6 +500,7 @@ export default function CompanyProfile() {
                   <span className="text-sm font-semibold text-slate-700">
                     Logo image URL
                   </span>
+
                   <input
                     type="url"
                     name="logoUrl"
@@ -463,19 +534,13 @@ export default function CompanyProfile() {
                 </p>
 
                 <div className="mt-4 space-y-3">
-                  {[
-                    ["Company name", Boolean(profile.name.trim())],
-                    ["Website", Boolean(profile.website.trim())],
-                    ["Location", Boolean(profile.location.trim())],
-                    ["Description", Boolean(profile.description.trim())],
-                    ["Contact email", Boolean(profile.email.trim())],
-                  ].map(([label, complete]) => (
+                  {checklist.map(([label, complete]) => (
                     <div
                       key={label}
                       className="flex items-center gap-2.5 text-sm"
                     >
                       <span
-                        className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
                           complete
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-white text-slate-400"
@@ -497,7 +562,10 @@ export default function CompanyProfile() {
               </section>
 
               <section className="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 className="font-bold text-slate-900">Before publishing</h2>
+                <h2 className="font-bold text-slate-900">
+                  Before publishing
+                </h2>
+
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   Make sure your company details and recruitment contact
                   information are accurate.
@@ -507,12 +575,21 @@ export default function CompanyProfile() {
           </div>
 
           {/* Save action */}
+          {errors.form && (
+            <p
+              role="alert"
+              className="mb-3 mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+            >
+              {errors.form}
+            </p>
+          )}
+
           <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="text-sm text-slate-500">
               {saved ? (
                 <span className="inline-flex items-center gap-2 font-semibold text-emerald-700">
                   <CheckCircle2 size={17} />
-                  Changes applied in this demo.
+                  Changes saved in this browser.
                 </span>
               ) : (
                 "Review your company information before saving."
@@ -530,8 +607,8 @@ export default function CompanyProfile() {
         </form>
 
         <p className="mt-4 text-xs leading-5 text-slate-400">
-          Demo mode: saving updates the page state only. Changes are not
-          persisted after refreshing the browser.
+          Demo storage: profile changes persist in this browser. Connect a
+          backend API for shared company data across devices and users.
         </p>
       </div>
     </main>
