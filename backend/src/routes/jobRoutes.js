@@ -16,24 +16,61 @@ const {
 
 const router = express.Router();
 
+// ============================================
+// ROLES
+// ============================================
+
 const recruitersAndAdmins = [
   "RECRUITER",
   "ADMIN",
   "SUPER_ADMIN",
 ];
 
-// Public routes
-router.get("/", getJobs);
-router.get("/:id", getJobById);
+// ============================================
+// PUBLIC ROUTES
+// ============================================
 
-// Protected routes
-router.use(protect);
+// List all open jobs
+router.get(
+  "/",
+  getJobs
+);
+
+// ============================================
+// PROTECTED "MY JOBS" ROUTE
+// ============================================
+//
+// IMPORTANT:
+// This MUST come before "/:id".
+// Otherwise Express would treat "my" as a job ID.
+//
 
 router.get(
   "/my",
+  protect,
   authorize(...recruitersAndAdmins),
   getMyJobs
 );
+
+// ============================================
+// PUBLIC JOB DETAILS
+// ============================================
+
+// Get one open job
+router.get(
+  "/:id",
+  getJobById
+);
+
+// ============================================
+// PROTECTED JOB ROUTES
+// ============================================
+
+router.use(protect);
+
+// ============================================
+// CREATE JOB
+// ============================================
 
 router.post(
   "/",
@@ -41,11 +78,19 @@ router.post(
   createJob
 );
 
+// ============================================
+// UPDATE JOB
+// ============================================
+
 router.put(
   "/:id",
   authorize(...recruitersAndAdmins),
   updateJob
 );
+
+// ============================================
+// DELETE JOB
+// ============================================
 
 router.delete(
   "/:id",

@@ -10,13 +10,47 @@ const {
   protect,
 } = require("../middleware/authMiddleware");
 
+const {
+  registerValidation,
+  loginValidation,
+} = require("../middleware/authValidation");
+
+const validate = require("../middleware/validate");
+
+const authRateLimiter = require("../middleware/authRateLimiter");
+
 const router = express.Router();
 
-// Public routes
-router.post("/register", register);
-router.post("/login", login);
+// ============================================
+// PUBLIC AUTH ROUTES
+// ============================================
 
-// Protected route
-router.get("/me", protect, getMe);
+// Register
+router.post(
+  "/register",
+  authRateLimiter,
+  registerValidation,
+  validate,
+  register
+);
+
+// Login
+router.post(
+  "/login",
+  authRateLimiter,
+  loginValidation,
+  validate,
+  login
+);
+
+// ============================================
+// PROTECTED AUTH ROUTES
+// ============================================
+
+router.get(
+  "/me",
+  protect,
+  getMe
+);
 
 module.exports = router;

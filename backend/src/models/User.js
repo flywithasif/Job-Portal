@@ -1,8 +1,129 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+// ============================================
+// EDUCATION SUB-SCHEMA
+// ============================================
+
+const educationSchema = new mongoose.Schema(
+  {
+    institution: {
+      type: String,
+      trim: true,
+      maxlength: [200, "Institution cannot exceed 200 characters"],
+    },
+
+    degree: {
+      type: String,
+      trim: true,
+      maxlength: [150, "Degree cannot exceed 150 characters"],
+    },
+
+    fieldOfStudy: {
+      type: String,
+      trim: true,
+      maxlength: [
+        150,
+        "Field of study cannot exceed 150 characters",
+      ],
+    },
+
+    startYear: {
+      type: Number,
+      min: [1950, "Start year is invalid"],
+      max: [2100, "Start year is invalid"],
+    },
+
+    endYear: {
+      type: Number,
+      min: [1950, "End year is invalid"],
+      max: [2100, "End year is invalid"],
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      maxlength: [
+        1000,
+        "Education description cannot exceed 1000 characters",
+      ],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+// ============================================
+// EXPERIENCE SUB-SCHEMA
+// ============================================
+
+const experienceSchema = new mongoose.Schema(
+  {
+    company: {
+      type: String,
+      trim: true,
+      maxlength: [200, "Company cannot exceed 200 characters"],
+    },
+
+    position: {
+      type: String,
+      trim: true,
+      maxlength: [150, "Position cannot exceed 150 characters"],
+    },
+
+    employmentType: {
+      type: String,
+      enum: [
+        "",
+        "FULL_TIME",
+        "PART_TIME",
+        "CONTRACT",
+        "INTERNSHIP",
+        "FREELANCE",
+      ],
+      default: "",
+    },
+
+    startDate: {
+      type: Date,
+      default: null,
+    },
+
+    endDate: {
+      type: Date,
+      default: null,
+    },
+
+    currentlyWorking: {
+      type: Boolean,
+      default: false,
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      maxlength: [
+        2000,
+        "Experience description cannot exceed 2000 characters",
+      ],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+// ============================================
+// USER SCHEMA
+// ============================================
+
 const userSchema = new mongoose.Schema(
   {
+    // ==========================================
+    // BASIC INFORMATION
+    // ==========================================
+
     name: {
       type: String,
       required: [true, "Name is required"],
@@ -18,24 +139,45 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       index: true,
+      maxlength: [254, "Email cannot exceed 254 characters"],
       match: [
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
         "Please enter a valid email address",
       ],
     },
 
+    // ==========================================
+    // PASSWORD
+    // ==========================================
+
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [8, "Password must be at least 8 characters"],
+      minlength: [
+        8,
+        "Password must be at least 8 characters",
+      ],
+      maxlength: [
+        128,
+        "Password cannot exceed 128 characters",
+      ],
       select: false,
     },
+
+    // ==========================================
+    // CONTACT
+    // ==========================================
 
     phone: {
       type: String,
       trim: true,
+      maxlength: [20, "Phone number is invalid"],
       default: "",
     },
+
+    // ==========================================
+    // ROLE
+    // ==========================================
 
     role: {
       type: String,
@@ -49,10 +191,127 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ==========================================
+    // PROFILE PHOTO
+    // ==========================================
+
     profilePhoto: {
       type: String,
+      trim: true,
+      maxlength: [2048, "Profile photo URL is too long"],
       default: "",
     },
+
+    // ==========================================
+    // PROFESSIONAL PROFILE
+    // ==========================================
+
+    headline: {
+      type: String,
+      trim: true,
+      maxlength: [
+        160,
+        "Headline cannot exceed 160 characters",
+      ],
+      default: "",
+    },
+
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [
+        150,
+        "Location cannot exceed 150 characters",
+      ],
+      default: "",
+    },
+
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [
+        3000,
+        "Bio cannot exceed 3000 characters",
+      ],
+      default: "",
+    },
+
+    skills: {
+      type: [
+        {
+          type: String,
+          trim: true,
+          maxlength: [
+            80,
+            "Skill cannot exceed 80 characters",
+          ],
+        },
+      ],
+
+      // Prevent unlimited skill entries.
+      validate: {
+        validator: (skills) => skills.length <= 50,
+        message: "You can add a maximum of 50 skills.",
+      },
+
+      default: [],
+    },
+
+    resumeUrl: {
+      type: String,
+      trim: true,
+      maxlength: [2048, "Resume URL is too long"],
+      default: "",
+    },
+
+    linkedinUrl: {
+      type: String,
+      trim: true,
+      maxlength: [2048, "LinkedIn URL is too long"],
+      default: "",
+    },
+
+    portfolioUrl: {
+      type: String,
+      trim: true,
+      maxlength: [2048, "Portfolio URL is too long"],
+      default: "",
+    },
+
+    // ==========================================
+    // EDUCATION
+    // ==========================================
+
+    education: {
+      type: [educationSchema],
+
+      validate: {
+        validator: (education) => education.length <= 20,
+        message: "You can add a maximum of 20 education entries.",
+      },
+
+      default: [],
+    },
+
+    // ==========================================
+    // EXPERIENCE
+    // ==========================================
+
+    experience: {
+      type: [experienceSchema],
+
+      validate: {
+        validator: (experience) => experience.length <= 20,
+        message:
+          "You can add a maximum of 20 experience entries.",
+      },
+
+      default: [],
+    },
+
+    // ==========================================
+    // ACCOUNT STATUS
+    // ==========================================
 
     isActive: {
       type: Boolean,
@@ -70,35 +329,99 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
   },
+
   {
     timestamps: true,
   }
 );
 
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
+// ============================================
+// VALIDATE EDUCATION YEARS
+// ============================================
+
+educationSchema.pre("validate", function (next) {
+  if (
+    this.startYear !== undefined &&
+    this.endYear !== undefined &&
+    this.endYear < this.startYear
+  ) {
+    return next(
+      new Error("Education end year cannot be before start year.")
+    );
   }
-
-  const salt = await bcrypt.genSalt(12);
-
-  this.password = await bcrypt.hash(
-    this.password,
-    salt
-  );
 
   next();
 });
 
-// Compare password during login
+// ============================================
+// VALIDATE EXPERIENCE DATES
+// ============================================
+
+experienceSchema.pre("validate", function (next) {
+  if (
+    this.startDate &&
+    this.endDate &&
+    this.endDate < this.startDate
+  ) {
+    return next(
+      new Error(
+        "Experience end date cannot be before start date."
+      )
+    );
+  }
+
+  if (this.currentlyWorking) {
+    this.endDate = null;
+  }
+
+  next();
+});
+
+// ============================================
+// HASH PASSWORD BEFORE SAVE
+// ============================================
+
+userSchema.pre("save", async function (next) {
+  try {
+    // Password has not changed.
+    if (!this.isModified("password")) {
+      return next();
+    }
+
+    // Generate secure bcrypt salt.
+    const salt = await bcrypt.genSalt(12);
+
+    // Hash password.
+    this.password = await bcrypt.hash(
+      this.password,
+      salt
+    );
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// COMPARE PASSWORD
+// ============================================
+
 userSchema.methods.comparePassword = async function (
   candidatePassword
 ) {
+  if (!candidatePassword || !this.password) {
+    return false;
+  }
+
   return bcrypt.compare(
     candidatePassword,
     this.password
   );
 };
+
+// ============================================
+// EXPORT MODEL
+// ============================================
 
 module.exports = mongoose.model("User", userSchema);

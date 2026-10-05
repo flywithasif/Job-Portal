@@ -4,15 +4,22 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
-const jobRoutes = require("./routes/jobRoutes");
+
+// ============================================
+// ROUTES
+// ============================================
 
 const authRoutes = require("./routes/authRoutes");
+const jobRoutes = require("./routes/jobRoutes");
 const companyRoutes = require("./routes/companyRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
 // ============================================
-// SECURITY
+// SECURITY HEADERS
 // ============================================
 
 app.use(helmet());
@@ -21,25 +28,66 @@ app.use(helmet());
 // CORS
 // ============================================
 
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  : [];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header.
+      // Example: Postman, server-to-server requests.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(
+        new Error("CORS policy: Origin not allowed.")
+      );
+    },
+
     credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
 // ============================================
-// RATE LIMIT
+// GENERAL API RATE LIMIT
 // ============================================
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+
   max: 300,
-  standardHeaders: true,
+
+  standardHeaders: "draft-7",
+
   legacyHeaders: false,
+
   message: {
     success: false,
-    message: "Too many requests. Please try again later.",
+    message:
+      "Too many requests. Please try again later.",
   },
 });
 
@@ -49,12 +97,16 @@ app.use("/api", apiLimiter);
 // BODY PARSER
 // ============================================
 
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "1mb",
+  })
+);
 
 app.use(
   express.urlencoded({
     extended: true,
-    limit: "10mb",
+    limit: "1mb",
   })
 );
 
@@ -73,7 +125,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // ============================================
-// HEALTH
+// HEALTH CHECK
 // ============================================
 
 app.get("/api/health", (req, res) => {
@@ -98,16 +150,26 @@ app.get("/api", (req, res) => {
 });
 
 // ============================================
-// AUTH ROUTES
+// API ROUTES
 // ============================================
 
 app.use("/api/auth", authRoutes);
+
 app.use("/api/jobs", jobRoutes);
 
-
 app.use("/api/companies", companyRoutes);
+
+app.use(
+  "/api/applications",
+  applicationRoutes
+);
+
+app.use("/api/profile", profileRoutes);
+
+app.use("/api/admin", adminRoutes);
+
 // ============================================
-// 404
+// 404 - ROUTE NOT FOUND
 // ============================================
 
 app.use((req, res) => {
@@ -124,12 +186,66 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("ERROR:", err);
 
-  const statusCode = err.statusCode || 500;
+  // CORS error
+  if (
+    err.message ===
+    "CORS policy: Origin not allowed."
+  ) {
+    return res.status(403).json({
+      success: false,
+      message: "Request origin is not allowed.",
+    });
+  }
+
+  // Mongoose validation error
+  if (err.name === "ValidationError") {
+    const errors = Object.values(err.errors).map(
+      (error) => ({
+        field: error.path,
+        message: error.message,
+      })
+    );
+
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed.",
+      errors,
+    });
+  }
+
+  // MongoDB duplicate key error
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message:
+        "A record with the provided value already exists.",
+    });
+  }
+
+  // Invalid MongoDB ObjectId
+  if (err.name === "CastError") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resource ID.",
+    });
+  }
+
+  // Production-safe error response
+  const statusCode =
+    err.statusCode &&
+    Number.isInteger(err.statusCode)
+      ? err.statusCode
+      : 500;
+
+  const message =
+    statusCode >= 500 &&
+    process.env.NODE_ENV === "production"
+      ? "Internal server error."
+      : err.message || "Internal server error.";
 
   res.status(statusCode).json({
     success: false,
-    message:
-      err.message || "Internal server error",
+    message,
   });
 });
 

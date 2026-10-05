@@ -1,32 +1,78 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// ============================================
+// AUTHENTICATION MIDDLEWARE
+// ============================================
+
 const protect = async (req, res, next) => {
   try {
-    let token;
+    // ==========================================
+    // JWT SECRET CHECK
+    // ==========================================
 
-    // Read Bearer token
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer ")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
+    if (!process.env.JWT_SECRET) {
+      return next(
+        new Error(
+          "JWT_SECRET is not configured in environment variables."
+        )
+      );
     }
 
-    if (!token) {
+    // ==========================================
+    // READ AUTHORIZATION HEADER
+    // ==========================================
+
+    const authorization = req.headers.authorization;
+
+    if (!authorization) {
       return res.status(401).json({
         success: false,
         message: "Authentication required. Please login.",
       });
     }
 
-    // Verify token
+    // Must be exactly: Bearer <token>
+    const [scheme, token] = authorization.trim().split(/\s+/);
+
+    if (
+      scheme !== "Bearer" ||
+      !token ||
+      authorization.trim().split(/\s+/).length !== 2
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication format.",
+      });
+    }
+
+    // ==========================================
+    // VERIFY JWT
+    // ==========================================
+
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
+      {
+        algorithms: ["HS256"],
+      }
     );
 
-    // Find user
+    // ==========================================
+    // VALIDATE JWT PAYLOAD
+    // ==========================================
+
+    if (!decoded?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication token.",
+      });
+    }
+
+    // ==========================================
+    // FIND USER
+    // ==========================================
+
     const user = await User.findById(decoded.userId).select(
       "-password"
     );
@@ -38,6 +84,10 @@ const protect = async (req, res, next) => {
       });
     }
 
+    // ==========================================
+    // CHECK ACCOUNT STATUS
+    // ==========================================
+
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
@@ -45,11 +95,18 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Attach user to request
+    // ==========================================
+    // ATTACH USER TO REQUEST
+    // ==========================================
+
     req.user = user;
 
     next();
   } catch (error) {
+    // ==========================================
+    // JWT ERRORS
+    // ==========================================
+
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
@@ -57,20 +114,31 @@ const protect = async (req, res, next) => {
       });
     }
 
-    if (error.name === "JsonWebTokenError") {
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "NotBeforeError"
+    ) {
       return res.status(401).json({
         success: false,
         message: "Invalid authentication token.",
       });
     }
 
+    // ==========================================
+    // OTHER ERRORS
+    // ==========================================
+
     next(error);
   }
 };
 
-// Role based authorization
+// ============================================
+// ROLE-BASED AUTHORIZATION
+// ============================================
+
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
+    // User must already be authenticated
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -78,10 +146,12 @@ const authorize = (...allowedRoles) => {
       });
     }
 
+    // Check user role
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to access this resource.",
+        message:
+          "You do not have permission to access this resource.",
       });
     }
 

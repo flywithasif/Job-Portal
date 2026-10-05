@@ -15,7 +15,10 @@ const register = async (req, res, next) => {
       role,
     } = req.body;
 
-    // Basic validation
+    // ==========================================
+    // BASIC VALIDATION
+    // ==========================================
+
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -23,45 +26,66 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Check existing user
-    const existingUser = await User.findOne({
-      email: email.toLowerCase(),
-    });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "An account with this email already exists.",
-      });
-    }
-
-    /*
-      IMPORTANT:
-      Public registration can only create
-      JOB_SEEKER or RECRUITER.
-
-      ADMIN/SUPER_ADMIN cannot be created
-      through public registration.
-    */
+    // ==========================================
+    // PUBLIC ROLE RESTRICTION
+    // ==========================================
+    //
+    // Public registration can ONLY create:
+    // JOB_SEEKER or RECRUITER.
+    //
+    // ADMIN / SUPER_ADMIN must NEVER be created
+    // through the public registration endpoint.
+    //
 
     const allowedRole =
       role === "RECRUITER"
         ? "RECRUITER"
         : "JOB_SEEKER";
 
-    // Create user
+    // ==========================================
+    // CHECK EXISTING USER
+    // ==========================================
+
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    }).select("_id");
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "An account with this email already exists.",
+      });
+    }
+
+    // ==========================================
+    // CREATE USER
+    // ==========================================
+
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: normalizedEmail,
       password,
-      phone: phone || "",
+      phone:
+        typeof phone === "string"
+          ? phone.trim()
+          : "",
       role: allowedRole,
     });
 
-    // Generate JWT
+    // ==========================================
+    // GENERATE JWT
+    // ==========================================
+
     const token = generateToken(user._id);
 
-    res.status(201).json({
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(201).json({
       success: true,
       message: "Registration successful.",
       data: {
@@ -78,6 +102,18 @@ const register = async (req, res, next) => {
       },
     });
   } catch (error) {
+    // ==========================================
+    // DUPLICATE EMAIL RACE CONDITION
+    // ==========================================
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "An account with this email already exists.",
+      });
+    }
+
     next(error);
   }
 };
@@ -93,52 +129,101 @@ const login = async (req, res, next) => {
       password,
     } = req.body;
 
+    // ==========================================
+    // BASIC VALIDATION
+    // ==========================================
+
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required.",
+        message:
+          "Email and password are required.",
       });
     }
 
-    // Password is select:false in model,
-    // so explicitly select it here.
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // ==========================================
+    // FIND USER
+    // ==========================================
+    //
+    // Password is select:false in User model,
+    // therefore explicitly include it for login.
+    //
+
     const user = await User.findOne({
-      email: email.toLowerCase(),
-    }).select("+password");
+      email: normalizedEmail,
+    }).select(
+      "+password"
+    );
+
+    // ==========================================
+    // INVALID CREDENTIALS
+    // ==========================================
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password.",
+        message:
+          "Invalid email or password.",
       });
     }
+
+    // ==========================================
+    // ACCOUNT STATUS
+    // ==========================================
 
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message: "Your account has been deactivated.",
+        message:
+          "Your account has been deactivated.",
       });
     }
 
-    // Compare password
+    // ==========================================
+    // PASSWORD CHECK
+    // ==========================================
+
     const isPasswordCorrect =
       await user.comparePassword(password);
 
     if (!isPasswordCorrect) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password.",
+        message:
+          "Invalid email or password.",
       });
     }
 
-    // Update login time
-    user.lastLoginAt = new Date();
-    await user.save({ validateBeforeSave: false });
+    // ==========================================
+    // UPDATE LAST LOGIN
+    // ==========================================
 
-    // Generate token
+    const lastLoginAt = new Date();
+
+    await User.updateOne(
+      {
+        _id: user._id,
+      },
+      {
+        $set: {
+          lastLoginAt,
+        },
+      }
+    );
+
+    // ==========================================
+    // GENERATE JWT
+    // ==========================================
+
     const token = generateToken(user._id);
 
-    res.status(200).json({
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(200).json({
       success: true,
       message: "Login successful.",
       data: {
@@ -149,8 +234,9 @@ const login = async (req, res, next) => {
           phone: user.phone,
           role: user.role,
           profilePhoto: user.profilePhoto,
-          isEmailVerified: user.isEmailVerified,
-          lastLoginAt: user.lastLoginAt,
+          isEmailVerified:
+            user.isEmailVerified,
+          lastLoginAt,
         },
         token,
       },
@@ -166,16 +252,52 @@ const login = async (req, res, next) => {
 
 const getMe = async (req, res, next) => {
   try {
-    res.status(200).json({
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authentication required.",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
       data: {
-        user: req.user,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          profilePhoto: user.profilePhoto,
+          headline: user.headline,
+          location: user.location,
+          bio: user.bio,
+          skills: user.skills,
+          resumeUrl: user.resumeUrl,
+          linkedinUrl: user.linkedinUrl,
+          portfolioUrl: user.portfolioUrl,
+          education: user.education,
+          experience: user.experience,
+          isActive: user.isActive,
+          isEmailVerified:
+            user.isEmailVerified,
+          lastLoginAt: user.lastLoginAt,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
       },
     });
   } catch (error) {
     next(error);
   }
 };
+
+// ============================================
+// EXPORT
+// ============================================
 
 module.exports = {
   register,
