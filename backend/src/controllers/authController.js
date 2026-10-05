@@ -2,6 +2,37 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 
 // ============================================
+// SAFE USER RESPONSE
+// ============================================
+//
+// Never return password or other sensitive
+// internal account data from auth responses.
+//
+
+const buildSafeUser = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  phone: user.phone,
+  role: user.role,
+  profilePhoto: user.profilePhoto,
+  headline: user.headline,
+  location: user.location,
+  bio: user.bio,
+  skills: user.skills,
+  resumeUrl: user.resumeUrl,
+  linkedinUrl: user.linkedinUrl,
+  portfolioUrl: user.portfolioUrl,
+  education: user.education,
+  experience: user.experience,
+  isActive: user.isActive,
+  isEmailVerified: user.isEmailVerified,
+  lastLoginAt: user.lastLoginAt,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
+
+// ============================================
 // REGISTER
 // ============================================
 
@@ -22,27 +53,58 @@ const register = async (req, res, next) => {
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Name, email and password are required.",
+        message:
+          "Name, email and password are required.",
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    // ==========================================
+    // NORMALIZE INPUT
+    // ==========================================
+
+    const normalizedName = name.trim();
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
+
+    const normalizedPhone =
+      typeof phone === "string"
+        ? phone.trim()
+        : "";
+
+    // ==========================================
+    // NAME VALIDATION
+    // ==========================================
+
+    if (
+      normalizedName.length < 2 ||
+      normalizedName.length > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Name must be between 2 and 100 characters.",
+      });
+    }
 
     // ==========================================
     // PUBLIC ROLE RESTRICTION
     // ==========================================
     //
     // Public registration can ONLY create:
-    // JOB_SEEKER or RECRUITER.
     //
-    // ADMIN / SUPER_ADMIN must NEVER be created
-    // through the public registration endpoint.
+    // JOB_SEEKER
+    // RECRUITER
+    //
+    // ADMIN and SUPER_ADMIN can NEVER be created
+    // through this endpoint.
     //
 
-    const allowedRole =
-      role === "RECRUITER"
-        ? "RECRUITER"
-        : "JOB_SEEKER";
+    let allowedRole = "JOB_SEEKER";
+
+    if (role === "RECRUITER") {
+      allowedRole = "RECRUITER";
+    }
 
     // ==========================================
     // CHECK EXISTING USER
@@ -65,13 +127,10 @@ const register = async (req, res, next) => {
     // ==========================================
 
     const user = await User.create({
-      name: name.trim(),
+      name: normalizedName,
       email: normalizedEmail,
       password,
-      phone:
-        typeof phone === "string"
-          ? phone.trim()
-          : "",
+      phone: normalizedPhone,
       role: allowedRole,
     });
 
@@ -89,15 +148,7 @@ const register = async (req, res, next) => {
       success: true,
       message: "Registration successful.",
       data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          profilePhoto: user.profilePhoto,
-          isEmailVerified: user.isEmailVerified,
-        },
+        user: buildSafeUser(user),
         token,
       },
     });
@@ -141,21 +192,25 @@ const login = async (req, res, next) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    // ==========================================
+    // NORMALIZE EMAIL
+    // ==========================================
+
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
 
     // ==========================================
     // FIND USER
     // ==========================================
     //
-    // Password is select:false in User model,
-    // therefore explicitly include it for login.
+    // Password is select:false in the User model.
+    // Explicitly include it only for authentication.
     //
 
     const user = await User.findOne({
       email: normalizedEmail,
-    }).select(
-      "+password"
-    );
+    }).select("+password");
 
     // ==========================================
     // INVALID CREDENTIALS
@@ -213,6 +268,9 @@ const login = async (req, res, next) => {
       }
     );
 
+    // Keep returned object synchronized.
+    user.lastLoginAt = lastLoginAt;
+
     // ==========================================
     // GENERATE JWT
     // ==========================================
@@ -227,17 +285,7 @@ const login = async (req, res, next) => {
       success: true,
       message: "Login successful.",
       data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          profilePhoto: user.profilePhoto,
-          isEmailVerified:
-            user.isEmailVerified,
-          lastLoginAt,
-        },
+        user: buildSafeUser(user),
         token,
       },
     });
@@ -249,12 +297,16 @@ const login = async (req, res, next) => {
 // ============================================
 // GET CURRENT USER
 // ============================================
+//
+// GET /api/auth/me
+//
+// Authentication middleware already verifies
+// the token and attaches the user to req.user.
+//
 
 const getMe = async (req, res, next) => {
   try {
-    const user = req.user;
-
-    if (!user) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
         message:
@@ -265,29 +317,7 @@ const getMe = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          profilePhoto: user.profilePhoto,
-          headline: user.headline,
-          location: user.location,
-          bio: user.bio,
-          skills: user.skills,
-          resumeUrl: user.resumeUrl,
-          linkedinUrl: user.linkedinUrl,
-          portfolioUrl: user.portfolioUrl,
-          education: user.education,
-          experience: user.experience,
-          isActive: user.isActive,
-          isEmailVerified:
-            user.isEmailVerified,
-          lastLoginAt: user.lastLoginAt,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        },
+        user: buildSafeUser(req.user),
       },
     });
   } catch (error) {

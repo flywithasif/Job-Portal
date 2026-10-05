@@ -10,6 +10,8 @@ const registerValidation = [
   // --------------------------------------------
 
   body("name")
+    .isString()
+    .withMessage("Name must be a string.")
     .trim()
     .notEmpty()
     .withMessage("Name is required.")
@@ -26,6 +28,8 @@ const registerValidation = [
   // --------------------------------------------
 
   body("email")
+    .isString()
+    .withMessage("Email must be a string.")
     .trim()
     .notEmpty()
     .withMessage("Email is required.")
@@ -59,7 +63,9 @@ const registerValidation = [
       values: "falsy",
     })
     .isString()
-    .withMessage("Phone number must be a string.")
+    .withMessage(
+      "Phone number must be a string."
+    )
     .trim()
     .isLength({
       max: 20,
@@ -79,6 +85,8 @@ const loginValidation = [
   // --------------------------------------------
 
   body("email")
+    .isString()
+    .withMessage("Email must be a string.")
     .trim()
     .notEmpty()
     .withMessage("Email is required.")
