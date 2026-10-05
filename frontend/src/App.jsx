@@ -1,43 +1,43 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
-import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Public pages
+import CompanyDetails from "./pages/CompanyDetails";
 import Home from "./pages/Home";
-import Jobs from "./pages/Jobs";
 import JobDetails from "./pages/JobDetails";
+import Jobs from "./pages/Jobs";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import CompanyDetails from "./pages/CompanyDetails";
 
 // Password recovery pages
 import ForgotPassword from "./pages/ForgotPassword";
-import VerifyOTP from "./pages/VerifyOTP";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyOTP from "./pages/VerifyOTP";
 
 // Job seeker pages
-import SeekerDashboard from "./pages/seeker/SeekerDashboard";
+import ApplicationDetails from "./pages/seeker/ApplicationDetails";
+import AppliedJobs from "./pages/seeker/AppliedJobs";
+import Interviews from "./pages/seeker/Interviews";
+import Notifications from "./pages/seeker/Notifications";
 import Profile from "./pages/seeker/Profile";
 import SavedJobs from "./pages/seeker/SavedJobs";
-import AppliedJobs from "./pages/seeker/AppliedJobs";
-import ApplicationDetails from "./pages/seeker/ApplicationDetails";
-import Notifications from "./pages/seeker/Notifications";
-import Interviews from "./pages/seeker/Interviews";
+import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 
 // Recruiter pages
-import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
-import ManageJobs from "./pages/recruiter/ManageJobs";
 import Applicants from "./pages/recruiter/Applicants";
 import CompanyProfile from "./pages/recruiter/CompanyProfile";
+import ManageJobs from "./pages/recruiter/ManageJobs";
+import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import Users from "./pages/admin/Users";
-import Companies from "./pages/admin/Companies";
 import AdminJobs from "./pages/admin/Jobs";
+import Companies from "./pages/admin/Companies";
 import Moderation from "./pages/admin/Moderation";
+import Users from "./pages/admin/Users";
 
 /*
  * Public layout
@@ -58,8 +58,8 @@ function PublicLayout() {
 /*
  * Dashboard layout
  *
- * Protected pages use the navbar but do not
- * display the public footer.
+ * Protected pages use the main navbar
+ * but do not display the public footer.
  */
 function DashboardLayout() {
   return (
@@ -73,7 +73,10 @@ function DashboardLayout() {
 /*
  * Simple public placeholder page.
  */
-function PlaceholderPage({ title, description }) {
+function PlaceholderPage({
+  title,
+  description,
+}) {
   return (
     <PublicLayout>
       <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-20 text-center">
@@ -81,7 +84,9 @@ function PlaceholderPage({ title, description }) {
           {title}
         </h1>
 
-        <p className="mt-3 text-slate-500">{description}</p>
+        <p className="mt-3 text-slate-500">
+          {description}
+        </p>
       </main>
     </PublicLayout>
   );
@@ -95,11 +100,20 @@ export default function App() {
           ========================================================= */}
 
       <Route element={<PublicLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={<Home />}
+        />
 
-        <Route path="/jobs" element={<Jobs />} />
+        <Route
+          path="/jobs"
+          element={<Jobs />}
+        />
 
-        <Route path="/jobs/:id" element={<JobDetails />} />
+        <Route
+          path="/jobs/:id"
+          element={<JobDetails />}
+        />
 
         <Route
           path="/companies"
@@ -111,7 +125,10 @@ export default function App() {
           }
         />
 
-        <Route path="/companies/:id" element={<CompanyDetails />} />
+        <Route
+          path="/companies/:id"
+          element={<CompanyDetails />}
+        />
 
         <Route
           path="/career-advice"
@@ -125,9 +142,15 @@ export default function App() {
 
         {/* Authentication */}
 
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
-        <Route path="/register" element={<Register />} />
+        <Route
+          path="/register"
+          element={<Register />}
+        />
 
         {/* Password recovery */}
 
@@ -136,7 +159,10 @@ export default function App() {
           element={<ForgotPassword />}
         />
 
-        <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route
+          path="/verify-otp"
+          element={<VerifyOTP />}
+        />
 
         <Route
           path="/reset-password"
@@ -150,7 +176,9 @@ export default function App() {
 
       <Route
         element={
-          <ProtectedRoute allowedRoles={["JOB_SEEKER"]} />
+          <ProtectedRoute
+            allowedRoles={["JOB_SEEKER"]}
+          />
         }
       >
         <Route element={<DashboardLayout />}>
@@ -159,7 +187,10 @@ export default function App() {
             element={<SeekerDashboard />}
           />
 
-          <Route path="/profile" element={<Profile />} />
+          <Route
+            path="/profile"
+            element={<Profile />}
+          />
 
           <Route
             path="/saved-jobs"
@@ -194,17 +225,32 @@ export default function App() {
 
       <Route
         path="/dashboard/saved"
-        element={<Navigate to="/saved-jobs" replace />}
+        element={
+          <Navigate
+            to="/saved-jobs"
+            replace
+          />
+        }
       />
 
       <Route
         path="/dashboard/applications"
-        element={<Navigate to="/applied-jobs" replace />}
+        element={
+          <Navigate
+            to="/applied-jobs"
+            replace
+          />
+        }
       />
 
       <Route
         path="/dashboard/interviews"
-        element={<Navigate to="/interviews" replace />}
+        element={
+          <Navigate
+            to="/interviews"
+            replace
+          />
+        }
       />
 
       {/* =========================================================
@@ -213,7 +259,9 @@ export default function App() {
 
       <Route
         element={
-          <ProtectedRoute allowedRoles={["RECRUITER"]} />
+          <ProtectedRoute
+            allowedRoles={["RECRUITER"]}
+          />
         }
       >
         <Route element={<DashboardLayout />}>
@@ -246,7 +294,10 @@ export default function App() {
       <Route
         element={
           <ProtectedRoute
-            allowedRoles={["SUPER_ADMIN", "ADMIN"]}
+            allowedRoles={[
+              "SUPER_ADMIN",
+              "ADMIN",
+            ]}
           />
         }
       >
@@ -284,7 +335,12 @@ export default function App() {
 
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          <Navigate
+            to="/"
+            replace
+          />
+        }
       />
     </Routes>
   );

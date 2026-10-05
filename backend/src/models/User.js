@@ -57,7 +57,7 @@ const educationSchema = new mongoose.Schema(
   },
   {
     _id: false,
-  }
+  },
 );
 
 // ============================================
@@ -126,7 +126,7 @@ const experienceSchema = new mongoose.Schema(
   },
   {
     _id: false,
-  }
+  },
 );
 
 // ============================================
@@ -143,8 +143,8 @@ educationSchema.pre("validate", function (next) {
   ) {
     return next(
       new Error(
-        "Education end year cannot be before start year."
-      )
+        "Education end year cannot be before start year.",
+      ),
     );
   }
 
@@ -163,8 +163,8 @@ experienceSchema.pre("validate", function (next) {
   ) {
     return next(
       new Error(
-        "Experience end date cannot be before start date."
-      )
+        "Experience end date cannot be before start date.",
+      ),
     );
   }
 
@@ -448,32 +448,39 @@ const userSchema = new mongoose.Schema(
 
   {
     timestamps: true,
-  }
+  },
 );
 
 // ============================================
 // HASH PASSWORD BEFORE SAVE
 // ============================================
+//
+// IMPORTANT:
+// This is intentionally written as an async
+// middleware WITHOUT `next`.
+//
+// The previous version used:
+//
+//   async function (next) { ... next(); }
+//
+// That caused:
+//   TypeError: next is not a function
+//
+// ============================================
 
-userSchema.pre("save", async function (next) {
-  try {
-    // Do not re-hash password when unrelated
-    // user fields are updated.
-    if (!this.isModified("password")) {
-      return next();
-    }
-
-    const salt = await bcrypt.genSalt(12);
-
-    this.password = await bcrypt.hash(
-      this.password,
-      salt
-    );
-
-    next();
-  } catch (error) {
-    next(error);
+userSchema.pre("save", async function () {
+  // Do not re-hash password when unrelated
+  // user fields are updated.
+  if (!this.isModified("password")) {
+    return;
   }
+
+  const salt = await bcrypt.genSalt(12);
+
+  this.password = await bcrypt.hash(
+    this.password,
+    salt,
+  );
 });
 
 // ============================================
@@ -481,7 +488,7 @@ userSchema.pre("save", async function (next) {
 // ============================================
 
 userSchema.methods.comparePassword = async function (
-  candidatePassword
+  candidatePassword,
 ) {
   if (
     !candidatePassword ||
@@ -492,7 +499,7 @@ userSchema.methods.comparePassword = async function (
 
   return bcrypt.compare(
     candidatePassword,
-    this.password
+    this.password,
   );
 };
 
@@ -502,5 +509,5 @@ userSchema.methods.comparePassword = async function (
 
 module.exports = mongoose.model(
   "User",
-  userSchema
+  userSchema,
 );
