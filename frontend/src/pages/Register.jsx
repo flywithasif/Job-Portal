@@ -16,8 +16,12 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
+
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -28,6 +32,10 @@ export default function Register() {
     role: "JOB_SEEKER",
   });
 
+  // ==========================================
+  // HANDLE INPUT CHANGE
+  // ==========================================
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -37,54 +45,165 @@ export default function Register() {
     }));
   };
 
+  // ==========================================
+  // HANDLE REGISTER
+  // ==========================================
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    if (loading) {
+      return;
+    }
+
+    // ========================================
+    // NORMALIZE BASIC INPUT
+    // ========================================
+
     const name = form.name.trim();
-    const email = form.email.trim();
+    const email = form.email.trim().toLowerCase();
+
+    // ========================================
+    // CLIENT-SIDE VALIDATION
+    // ========================================
 
     if (!name || !email) {
-      toast.error("Please enter your name and email.");
+      toast.error(
+        "Please enter your name and email."
+      );
+
+      return;
+    }
+
+    if (name.length < 2) {
+      toast.error(
+        "Name must be at least 2 characters."
+      );
+
+      return;
+    }
+
+    if (name.length > 100) {
+      toast.error(
+        "Name cannot exceed 100 characters."
+      );
+
       return;
     }
 
     if (form.password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
-      return;
-    }
-
-    if (form.password !== form.confirmPassword) {
-      toast.error("Passwords do not match.");
-      return;
-    }
-
-    if (form.role !== "JOB_SEEKER") {
       toast.error(
-        "Recruiter registration requires backend support."
+        "Password must be at least 8 characters."
       );
+
       return;
     }
+
+    if (form.password.length > 128) {
+      toast.error(
+        "Password cannot exceed 128 characters."
+      );
+
+      return;
+    }
+
+    if (
+      form.password !==
+      form.confirmPassword
+    ) {
+      toast.error(
+        "Passwords do not match."
+      );
+
+      return;
+    }
+
+    // ========================================
+    // REGISTER
+    // ========================================
 
     try {
       setLoading(true);
 
-      const user = await register({
+      const response = await register({
         name,
         email,
         password: form.password,
         role: form.role,
       });
 
-      toast.success("Account created successfully!");
+      // ======================================
+      // GET ACTUAL BACKEND USER
+      // ======================================
+
+      const registeredUser =
+        response?.data?.user;
+
+      const role = String(
+        registeredUser?.role || ""
+      )
+        .trim()
+        .toUpperCase();
+
+      // ======================================
+      // VERIFY BACKEND ROLE
+      // ======================================
+
+      if (
+        role !== "JOB_SEEKER" &&
+        role !== "RECRUITER"
+      ) {
+        toast.error(
+          "Account role could not be verified."
+        );
+
+        return;
+      }
+
+      toast.success(
+        "Account created successfully!"
+      );
+
+      // ======================================
+      // ROLE-BASED REDIRECT
+      // ======================================
 
       navigate(
-        user.role === "RECRUITER"
+        role === "RECRUITER"
           ? "/recruiter"
           : "/dashboard",
-        { replace: true }
+        {
+          replace: true,
+        }
       );
     } catch (error) {
-      toast.error(error.message || "Unable to create account.");
+      // ======================================
+      // BACKEND VALIDATION ERROR
+      // ======================================
+
+      const backendMessage =
+        error?.response?.data?.message;
+
+      const validationErrors =
+        error?.response?.data?.errors;
+
+      if (
+        Array.isArray(validationErrors) &&
+        validationErrors.length > 0
+      ) {
+        toast.error(
+          validationErrors[0]?.message ||
+            "Please check your registration details."
+        );
+
+        return;
+      }
+
+      toast.error(
+        backendMessage ||
+          error?.message ||
+          "Unable to create account."
+      );
     } finally {
       setLoading(false);
     }
@@ -111,11 +230,15 @@ export default function Register() {
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Join professionals and companies growing with CareerFlow.
+            Join professionals and companies growing
+            with CareerFlow.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-8 space-y-5"
+        >
           {/* Account type */}
           <fieldset>
             <legend className="text-sm font-bold text-slate-700">
@@ -130,7 +253,9 @@ export default function Register() {
                 <button
                   key={value}
                   type="button"
-                  aria-pressed={form.role === value}
+                  aria-pressed={
+                    form.role === value
+                  }
                   onClick={() =>
                     setForm((previous) => ({
                       ...previous,
@@ -148,12 +273,12 @@ export default function Register() {
               ))}
             </div>
 
-            {form.role === "RECRUITER" && (
-              <p className="mt-2 text-xs leading-5 text-amber-700">
-                Recruiter account creation will be available after
-                backend registration is connected.
-              </p>
-            )}
+            {/* Role information */}
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {form.role === "RECRUITER"
+                ? "Create a recruiter account to manage companies, jobs and applications."
+                : "Create a job seeker account to discover jobs and manage your applications."}
+            </p>
           </fieldset>
 
           {/* Full name */}
@@ -207,6 +332,7 @@ export default function Register() {
                 type="email"
                 autoComplete="email"
                 required
+                maxLength={254}
                 value={form.email}
                 onChange={handleChange}
                 placeholder="you@example.com"
@@ -233,9 +359,14 @@ export default function Register() {
               <input
                 id="register-password"
                 name="password"
-                type={showPassword ? "text" : "password"}
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
                 autoComplete="new-password"
                 minLength={8}
+                maxLength={128}
                 required
                 value={form.password}
                 onChange={handleChange}
@@ -246,12 +377,16 @@ export default function Register() {
               <button
                 type="button"
                 aria-label={
-                  showPassword ? "Hide password" : "Show password"
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
                 }
                 onClick={() =>
-                  setShowPassword((previous) => !previous)
+                  setShowPassword(
+                    (previous) => !previous
+                  )
                 }
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0066b3]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0066b3]"
               >
                 {showPassword ? (
                   <EyeOff size={18} />
@@ -284,9 +419,14 @@ export default function Register() {
               <input
                 id="register-confirm-password"
                 name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
+                type={
+                  showConfirmPassword
+                    ? "text"
+                    : "password"
+                }
                 autoComplete="new-password"
                 required
+                maxLength={128}
                 value={form.confirmPassword}
                 onChange={handleChange}
                 placeholder="Re-enter your password"
@@ -301,9 +441,11 @@ export default function Register() {
                     : "Show confirm password"
                 }
                 onClick={() =>
-                  setShowConfirmPassword((previous) => !previous)
+                  setShowConfirmPassword(
+                    (previous) => !previous
+                  )
                 }
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0066b3]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0066b3]"
               >
                 {showConfirmPassword ? (
                   <EyeOff size={18} />
@@ -320,7 +462,9 @@ export default function Register() {
             disabled={loading}
             className="h-12 w-full rounded-xl bg-[#0066b3] text-sm font-extrabold text-white transition hover:bg-[#005493] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Creating account..." : "Create Account"}
+            {loading
+              ? "Creating account..."
+              : "Create Account"}
           </button>
         </form>
 

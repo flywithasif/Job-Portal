@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   getCompanies,
+  getMyCompany,
   getCompanyById,
   getCompanyJobs,
   createCompany,
@@ -22,31 +23,48 @@ const recruitersAndAdmins = [
   "SUPER_ADMIN",
 ];
 
-// Public routes
+// ============================================
+// PUBLIC ROUTES
+// ============================================
+
 router.get("/", getCompanies);
+
+// IMPORTANT:
+// /my must come BEFORE /:id
+router.get(
+  "/my",
+  protect,
+  authorize(...recruitersAndAdmins),
+  getMyCompany,
+);
+
 router.get("/:id/jobs", getCompanyJobs);
+
 router.get("/:id", getCompanyById);
 
-// Protected routes
+// ============================================
+// PROTECTED ROUTES
+// ============================================
+
 router.post(
   "/",
   protect,
   authorize(...recruitersAndAdmins),
-  createCompany
+  createCompany,
 );
 
 router.put(
   "/:id",
   protect,
   authorize(...recruitersAndAdmins),
-  updateCompany
+  updateCompany,
 );
 
 router.delete(
   "/:id",
   protect,
   authorize(...recruitersAndAdmins),
-  deleteCompany
+  deleteCompany,
 );
 
 module.exports = router;

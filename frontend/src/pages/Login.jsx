@@ -6,7 +6,11 @@ import {
   LockKeyhole,
   Mail,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { useAuth } from "../context/AuthContext";
@@ -23,76 +27,209 @@ export default function Login() {
   const [form, setForm] = useState({
     email: "",
     password: "",
-    role: "JOB_SEEKER",
   });
+
+  // ==========================================
+  // HANDLE INPUT CHANGE
+  // ==========================================
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  // ==========================================
+  // GET ROLE DEFAULT PATH
+  // ==========================================
+
+  const getDefaultPath = (role) => {
+    if (
+      role === "SUPER_ADMIN" ||
+      role === "ADMIN"
+    ) {
+      return "/admin";
+    }
+
+    if (role === "RECRUITER") {
+      return "/recruiter";
+    }
+
+    if (role === "JOB_SEEKER") {
+      return "/dashboard";
+    }
+
+    return null;
+  };
+
+  // ==========================================
+  // CHECK REQUESTED PATH
+  // ==========================================
+
+  const getAllowedRequestedPath = (role) => {
+    const requestedPath =
+      location.state?.from?.pathname;
+
+    if (!requestedPath) {
+      return null;
+    }
+
+    // ----------------------------------------
+    // ADMIN
+    // ----------------------------------------
+
+    if (
+      (role === "SUPER_ADMIN" ||
+        role === "ADMIN") &&
+      requestedPath.startsWith("/admin")
+    ) {
+      return requestedPath;
+    }
+
+    // ----------------------------------------
+    // RECRUITER
+    // ----------------------------------------
+
+    if (
+      role === "RECRUITER" &&
+      requestedPath.startsWith("/recruiter")
+    ) {
+      return requestedPath;
+    }
+
+    // ----------------------------------------
+    // JOB SEEKER
+    // ----------------------------------------
+
+    if (role === "JOB_SEEKER") {
+      const allowedPrefixes = [
+        "/dashboard",
+        "/profile",
+        "/saved-jobs",
+        "/applied-jobs",
+        "/applications/",
+        "/notifications",
+        "/interviews",
+      ];
+
+      const isAllowed = allowedPrefixes.some(
+        (prefix) =>
+          requestedPath === prefix ||
+          requestedPath.startsWith(`${prefix}/`)
+      );
+
+      if (isAllowed) {
+        return requestedPath;
+      }
+    }
+
+    return null;
+  };
+
+  // ==========================================
+  // HANDLE LOGIN
+  // ==========================================
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (loading) return;
+    if (loading) {
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const user = await login({
-        ...form,
-        rememberMe,
+      // ========================================
+      // REAL BACKEND LOGIN
+      // ========================================
+      //
+      // Backend only expects:
+      // email
+      // password
+      //
+      // Role is NOT trusted from frontend.
+      //
+
+      const response = await login({
+        email: form.email.trim(),
+        password: form.password,
       });
 
-      // Read the actual role returned by the authentication system.
-      const role = String(user?.role || "")
+      // ========================================
+      // GET AUTHENTICATED USER
+      // ========================================
+
+      const authenticatedUser =
+        response?.data?.user;
+
+      const role = String(
+        authenticatedUser?.role || ""
+      )
         .trim()
         .toUpperCase();
 
-      let defaultPath;
+      // ========================================
+      // ROLE VALIDATION
+      // ========================================
 
-      if (role === "SUPER_ADMIN" || role === "ADMIN") {
-        defaultPath = "/admin";
-      } else if (role === "RECRUITER") {
-        defaultPath = "/recruiter";
-      } else if (
-        role === "JOB_SEEKER" ||
-        role === "SEEKER"
-      ) {
-        defaultPath = "/dashboard";
-      } else {
+      const defaultPath =
+        getDefaultPath(role);
+
+      if (!defaultPath) {
         toast.error(
-          "Your account role could not be verified. Please check your login details."
+          "Your account role could not be verified."
         );
+
         return;
       }
 
-      // Only allow a requested destination belonging to this role.
-      const requestedPath = location.state?.from?.pathname;
+      // ========================================
+      // SAFE REDIRECT
+      // ========================================
 
-      const allowedPath =
-        requestedPath &&
-        (
-          (role === "SUPER_ADMIN" || role === "ADMIN") &&
-          requestedPath.startsWith("/admin")
-        ||
-          role === "RECRUITER" &&
-          requestedPath.startsWith("/recruiter")
-        ||
-          (role === "JOB_SEEKER" || role === "SEEKER") &&
-          (
-            requestedPath === "/dashboard" ||
-            requestedPath.startsWith("/profile") ||
-            requestedPath.startsWith("/saved-jobs") ||
-            requestedPath.startsWith("/applied-jobs") ||
-            requestedPath.startsWith("/applications/") ||
-            requestedPath.startsWith("/notifications") ||
-            requestedPath.startsWith("/interviews")
-          )
-        );
+      const requestedPath =
+        getAllowedRequestedPath(role);
 
       toast.success("Welcome back!");
 
-      navigate(allowedPath ? requestedPath : defaultPath, {
-        replace: true,
-      });
+      navigate(
+        requestedPath || defaultPath,
+        {
+          replace: true,
+        }
+      );
     } catch (error) {
-      toast.error(error?.message || "Unable to sign in.");
+      // ========================================
+      // BACKEND ERROR
+      // ========================================
+
+      const backendMessage =
+        error?.response?.data?.message;
+
+      const validationErrors =
+        error?.response?.data?.errors;
+
+      if (
+        Array.isArray(validationErrors) &&
+        validationErrors.length > 0
+      ) {
+        toast.error(
+          validationErrors[0]?.message ||
+            "Please check your login details."
+        );
+
+        return;
+      }
+
+      toast.error(
+        backendMessage ||
+          error?.message ||
+          "Unable to sign in. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -114,8 +251,9 @@ export default function Login() {
               </h1>
 
               <p className="mt-5 leading-7 text-slate-300">
-                Discover jobs, build your profile and manage your
-                career journey from one modern platform.
+                Discover jobs, build your profile and
+                manage your career journey from one
+                modern platform.
               </p>
             </div>
 
@@ -141,32 +279,11 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            <div>
-              <label
-                htmlFor="role"
-                className="text-sm font-bold text-slate-700"
-              >
-                Account type
-              </label>
-
-              <select
-                id="role"
-                value={form.role}
-                onChange={(event) =>
-                  setForm((previous) => ({
-                    ...previous,
-                    role: event.target.value,
-                  }))
-                }
-                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#0066b3] focus:ring-2 focus:ring-[#0066b3]/10"
-              >
-                <option value="JOB_SEEKER">Job Seeker</option>
-                <option value="RECRUITER">Recruiter</option>
-                <option value="SUPER_ADMIN">Admin Demo</option>
-              </select>
-            </div>
-
+          <form
+            onSubmit={handleSubmit}
+            className="mt-8 space-y-5"
+          >
+            {/* Email */}
             <div>
               <label
                 htmlFor="email"
@@ -183,22 +300,19 @@ export default function Login() {
 
                 <input
                   id="email"
+                  name="email"
                   type="email"
                   autoComplete="email"
                   required
                   value={form.email}
-                  onChange={(event) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      email: event.target.value,
-                    }))
-                  }
+                  onChange={handleChange}
                   placeholder="you@example.com"
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-[#0066b3] focus:bg-white"
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div>
               <label
                 htmlFor="password"
@@ -215,16 +329,16 @@ export default function Login() {
 
                 <input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
                   autoComplete="current-password"
                   required
                   value={form.password}
-                  onChange={(event) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      password: event.target.value,
-                    }))
-                  }
+                  onChange={handleChange}
                   placeholder="Enter your password"
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-12 text-sm outline-none transition focus:border-[#0066b3] focus:bg-white"
                 />
@@ -232,9 +346,15 @@ export default function Login() {
                 <button
                   type="button"
                   aria-label={
-                    showPassword ? "Hide password" : "Show password"
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
                   }
-                  onClick={() => setShowPassword((value) => !value)}
+                  onClick={() =>
+                    setShowPassword(
+                      (value) => !value
+                    )
+                  }
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0066b3]"
                 >
                   {showPassword ? (
@@ -253,10 +373,13 @@ export default function Login() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(event) =>
-                    setRememberMe(event.target.checked)
+                    setRememberMe(
+                      event.target.checked
+                    )
                   }
                   className="h-4 w-4 rounded border-slate-300 accent-[#0066b3]"
                 />
+
                 Remember me
               </label>
 
@@ -268,12 +391,15 @@ export default function Login() {
               </Link>
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
               className="h-12 w-full rounded-xl bg-[#0066b3] text-sm font-extrabold text-white transition hover:bg-[#005493] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading
+                ? "Signing in..."
+                : "Sign In"}
             </button>
           </form>
 

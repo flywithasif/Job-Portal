@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -39,37 +39,40 @@ import Companies from "./pages/admin/Companies";
 import AdminJobs from "./pages/admin/Jobs";
 import Moderation from "./pages/admin/Moderation";
 
-// Public pages use the main navbar and footer.
-function PublicLayout({ children }) {
+/*
+ * Public layout
+ *
+ * Used for public-facing pages that need
+ * the main navbar and footer.
+ */
+function PublicLayout() {
   return (
     <>
       <Navbar />
-      {children}
+      <Outlet />
       <Footer />
     </>
   );
 }
 
-// Dashboard pages use the navbar without the public footer.
-function DashboardLayoutWrapper({ children }) {
+/*
+ * Dashboard layout
+ *
+ * Protected pages use the navbar but do not
+ * display the public footer.
+ */
+function DashboardLayout() {
   return (
     <>
       <Navbar />
-      {children}
+      <Outlet />
     </>
   );
 }
 
-// Reusable role-protected route.
-function ProtectedPage({ roles, children }) {
-  return (
-    <ProtectedRoute roles={roles}>
-      <DashboardLayoutWrapper>{children}</DashboardLayoutWrapper>
-    </ProtectedRoute>
-  );
-}
-
-// Reusable public placeholder page.
+/*
+ * Simple public placeholder page.
+ */
 function PlaceholderPage({ title, description }) {
   return (
     <PublicLayout>
@@ -78,9 +81,7 @@ function PlaceholderPage({ title, description }) {
           {title}
         </h1>
 
-        <p className="mt-3 text-slate-500">
-          {description}
-        </p>
+        <p className="mt-3 text-slate-500">{description}</p>
       </main>
     </PublicLayout>
   );
@@ -89,177 +90,108 @@ function PlaceholderPage({ title, description }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public pages */}
-      <Route
-        path="/"
-        element={
-          <PublicLayout>
-            <Home />
-          </PublicLayout>
-        }
-      />
+      {/* =========================================================
+          PUBLIC ROUTES
+          ========================================================= */}
+
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<Home />} />
+
+        <Route path="/jobs" element={<Jobs />} />
+
+        <Route path="/jobs/:id" element={<JobDetails />} />
+
+        <Route
+          path="/companies"
+          element={
+            <PlaceholderPage
+              title="Explore Companies"
+              description="Company listings will be available here."
+            />
+          }
+        />
+
+        <Route path="/companies/:id" element={<CompanyDetails />} />
+
+        <Route
+          path="/career-advice"
+          element={
+            <PlaceholderPage
+              title="Career Advice"
+              description="Career resources will be available here."
+            />
+          }
+        />
+
+        {/* Authentication */}
+
+        <Route path="/login" element={<Login />} />
+
+        <Route path="/register" element={<Register />} />
+
+        {/* Password recovery */}
+
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+
+        <Route path="/verify-otp" element={<VerifyOTP />} />
+
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
+      </Route>
+
+      {/* =========================================================
+          JOB SEEKER ROUTES
+          ========================================================= */}
 
       <Route
-        path="/jobs"
         element={
-          <PublicLayout>
-            <Jobs />
-          </PublicLayout>
+          <ProtectedRoute allowedRoles={["JOB_SEEKER"]} />
         }
-      />
-
-      <Route
-        path="/jobs/:id"
-        element={
-          <PublicLayout>
-            <JobDetails />
-          </PublicLayout>
-        }
-      />
-
-      {/* Companies */}
-      <Route
-        path="/companies"
-        element={
-          <PlaceholderPage
-            title="Explore Companies"
-            description="Company listings will be available here."
+      >
+        <Route element={<DashboardLayout />}>
+          <Route
+            path="/dashboard"
+            element={<SeekerDashboard />}
           />
-        }
-      />
 
-      <Route
-        path="/companies/:id"
-        element={
-          <PublicLayout>
-            <CompanyDetails />
-          </PublicLayout>
-        }
-      />
+          <Route path="/profile" element={<Profile />} />
 
-      {/* Career advice */}
-      <Route
-        path="/career-advice"
-        element={
-          <PlaceholderPage
-            title="Career Advice"
-            description="Career resources will be available here."
+          <Route
+            path="/saved-jobs"
+            element={<SavedJobs />}
           />
-        }
-      />
 
-      {/* Authentication */}
-      <Route
-        path="/login"
-        element={
-          <PublicLayout>
-            <Login />
-          </PublicLayout>
-        }
-      />
+          <Route
+            path="/applied-jobs"
+            element={<AppliedJobs />}
+          />
 
-      <Route
-        path="/register"
-        element={
-          <PublicLayout>
-            <Register />
-          </PublicLayout>
-        }
-      />
+          <Route
+            path="/applications/:id"
+            element={<ApplicationDetails />}
+          />
 
-      {/* Password recovery */}
-      <Route
-        path="/forgot-password"
-        element={
-          <PublicLayout>
-            <ForgotPassword />
-          </PublicLayout>
-        }
-      />
+          <Route
+            path="/notifications"
+            element={<Notifications />}
+          />
 
-      <Route
-        path="/verify-otp"
-        element={
-          <PublicLayout>
-            <VerifyOTP />
-          </PublicLayout>
-        }
-      />
+          <Route
+            path="/interviews"
+            element={<Interviews />}
+          />
+        </Route>
+      </Route>
 
-      <Route
-        path="/reset-password"
-        element={
-          <PublicLayout>
-            <ResetPassword />
-          </PublicLayout>
-        }
-      />
+      {/* =========================================================
+          COMPATIBILITY ROUTES
+          ========================================================= */}
 
-      {/* Job seeker routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <SeekerDashboard />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/profile"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <Profile />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/saved-jobs"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <SavedJobs />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/applied-jobs"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <AppliedJobs />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/applications/:id"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <ApplicationDetails />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <Notifications />
-          </ProtectedPage>
-        }
-      />
-
-      <Route
-        path="/interviews"
-        element={
-          <ProtectedPage roles={["JOB_SEEKER"]}>
-            <Interviews />
-          </ProtectedPage>
-        }
-      />
-
-      {/* Compatibility routes for existing dashboard links */}
       <Route
         path="/dashboard/saved"
         element={<Navigate to="/saved-jobs" replace />}
@@ -275,90 +207,81 @@ export default function App() {
         element={<Navigate to="/interviews" replace />}
       />
 
-      {/* Recruiter routes */}
-      <Route
-        path="/recruiter"
-        element={
-          <ProtectedPage roles={["RECRUITER"]}>
-            <RecruiterDashboard />
-          </ProtectedPage>
-        }
-      />
+      {/* =========================================================
+          RECRUITER ROUTES
+          ========================================================= */}
 
       <Route
-        path="/recruiter/jobs"
         element={
-          <ProtectedPage roles={["RECRUITER"]}>
-            <ManageJobs />
-          </ProtectedPage>
+          <ProtectedRoute allowedRoles={["RECRUITER"]} />
         }
-      />
+      >
+        <Route element={<DashboardLayout />}>
+          <Route
+            path="/recruiter"
+            element={<RecruiterDashboard />}
+          />
+
+          <Route
+            path="/recruiter/jobs"
+            element={<ManageJobs />}
+          />
+
+          <Route
+            path="/recruiter/applicants"
+            element={<Applicants />}
+          />
+
+          <Route
+            path="/recruiter/company-profile"
+            element={<CompanyProfile />}
+          />
+        </Route>
+      </Route>
+
+      {/* =========================================================
+          ADMIN ROUTES
+          ========================================================= */}
 
       <Route
-        path="/recruiter/applicants"
         element={
-          <ProtectedPage roles={["RECRUITER"]}>
-            <Applicants />
-          </ProtectedPage>
+          <ProtectedRoute
+            allowedRoles={["SUPER_ADMIN", "ADMIN"]}
+          />
         }
-      />
+      >
+        <Route element={<DashboardLayout />}>
+          <Route
+            path="/admin"
+            element={<AdminDashboard />}
+          />
 
-      <Route
-        path="/recruiter/company-profile"
-        element={
-          <ProtectedPage roles={["RECRUITER"]}>
-            <CompanyProfile />
-          </ProtectedPage>
-        }
-      />
+          <Route
+            path="/admin/users"
+            element={<Users />}
+          />
 
-      {/* Admin routes */}
-      <Route
-        path="/admin"
-        element={
-          <ProtectedPage roles={["SUPER_ADMIN", "ADMIN"]}>
-            <AdminDashboard />
-          </ProtectedPage>
-        }
-      />
+          <Route
+            path="/admin/companies"
+            element={<Companies />}
+          />
 
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedPage roles={["SUPER_ADMIN", "ADMIN"]}>
-            <Users />
-          </ProtectedPage>
-        }
-      />
+          <Route
+            path="/admin/jobs"
+            element={<AdminJobs />}
+          />
 
-      <Route
-        path="/admin/companies"
-        element={
-          <ProtectedPage roles={["SUPER_ADMIN", "ADMIN"]}>
-            <Companies />
-          </ProtectedPage>
-        }
-      />
+          <Route
+            path="/admin/moderation"
+            element={<Moderation />}
+          />
+        </Route>
+      </Route>
 
-      <Route
-        path="/admin/jobs"
-        element={
-          <ProtectedPage roles={["SUPER_ADMIN", "ADMIN"]}>
-            <AdminJobs />
-          </ProtectedPage>
-        }
-      />
+      {/* =========================================================
+          UNKNOWN ROUTES
+          ========================================================= */}
 
-      <Route
-        path="/admin/moderation"
-        element={
-          <ProtectedPage roles={["SUPER_ADMIN", "ADMIN"]}>
-            <Moderation />
-          </ProtectedPage>
-        }
-      />
-
-      {/* Unknown URLs */}
       <Route
         path="*"
         element={<Navigate to="/" replace />}

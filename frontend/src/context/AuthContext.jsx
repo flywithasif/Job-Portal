@@ -1,127 +1,172 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  getCurrentUser,
+  loginUser,
+  registerUser,
+} from "../services/authService";
 
 const AuthContext = createContext(null);
 
-const DEMO_USERS = {
-  JOB_SEEKER: {
-    id: "user-001",
-    name: "Asif Khan",
-    email: "asif@example.com",
-    role: "JOB_SEEKER",
-  },
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  RECRUITER: {
-    id: "recruiter-001",
-    name: "Rahul Sharma",
-    email: "recruiter@example.com",
-    role: "RECRUITER",
-  },
-
-  ADMIN: {
-    id: "admin-001",
-    name: "Super Admin",
-    email: "admin@example.com",
-    role: "SUPER_ADMIN",
-  },
-
-  // Fix: Support the SUPER_ADMIN value sent by Login.jsx.
-  SUPER_ADMIN: {
-    id: "admin-001",
-    name: "Super Admin",
-    email: "admin@example.com",
-    role: "SUPER_ADMIN",
-  },
-};
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem("job_portal_user");
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
+  // ==========================================
+  // RESTORE AUTHENTICATION
+  // ==========================================
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem("job_portal_user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("job_portal_user");
-    }
-  }, [user]);
+    const restoreSession = async () => {
+      const token = localStorage.getItem(
+        "job_portal_token"
+      );
 
-  const login = async ({ email, password, role }) => {
-    if (!email?.trim() || !password) {
-      throw new Error("Email and password are required.");
-    }
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-    const selectedRole = String(role || "JOB_SEEKER")
-      .trim()
-      .toUpperCase();
+      try {
+        const response = await getCurrentUser();
 
-    const baseUser = DEMO_USERS[selectedRole];
+        setUser(response.data.user);
 
-    if (!baseUser) {
-      throw new Error("Invalid account type selected.");
-    }
+        localStorage.setItem(
+          "job_portal_user",
+          JSON.stringify(response.data.user)
+        );
+      } catch (error) {
+        console.error(
+          "Session restore failed:",
+          error
+        );
 
-    const loggedInUser = {
-      ...baseUser,
-      email: email.trim(),
+        localStorage.removeItem(
+          "job_portal_token"
+        );
+
+        localStorage.removeItem(
+          "job_portal_user"
+        );
+
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    restoreSession();
+  }, []);
+
+  // ==========================================
+  // LOGIN
+  // ==========================================
+
+  const login = async (credentials) => {
+    const response = await loginUser(credentials);
+
+    const loggedInUser =
+      response.data.user;
+
+    const token = response.data.token;
+
+    localStorage.setItem(
+      "job_portal_token",
+      token
+    );
+
+    localStorage.setItem(
+      "job_portal_user",
+      JSON.stringify(loggedInUser)
+    );
 
     setUser(loggedInUser);
 
-    return loggedInUser;
+    return response;
   };
 
-  const register = async ({ name, email, role }) => {
-    const selectedRole = String(role || "JOB_SEEKER")
-      .trim()
-      .toUpperCase();
+  // ==========================================
+  // REGISTER
+  // ==========================================
 
-    if (!["JOB_SEEKER", "RECRUITER"].includes(selectedRole)) {
-      throw new Error("Invalid registration account type.");
-    }
+  const register = async (userData) => {
+    const response =
+      await registerUser(userData);
 
-    const registeredUser = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-      role: selectedRole,
-    };
+    const registeredUser =
+      response.data.user;
+
+    const token = response.data.token;
+
+    localStorage.setItem(
+      "job_portal_token",
+      token
+    );
+
+    localStorage.setItem(
+      "job_portal_user",
+      JSON.stringify(registeredUser)
+    );
 
     setUser(registeredUser);
 
-    return registeredUser;
+    return response;
   };
 
+  // ==========================================
+  // LOGOUT
+  // ==========================================
+
   const logout = () => {
+    localStorage.removeItem(
+      "job_portal_token"
+    );
+
+    localStorage.removeItem(
+      "job_portal_user"
+    );
+
     setUser(null);
   };
 
+  // ==========================================
+  // CONTEXT VALUE
+  // ==========================================
+
+  const value = {
+    user,
+    loading,
+    isAuthenticated: Boolean(user),
+    login,
+    register,
+    logout,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        register,
-        logout,
-        isAuthenticated: Boolean(user),
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+// ============================================
+// CUSTOM HOOK
+// ============================================
+
+export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
+    throw new Error(
+      "useAuth must be used inside AuthProvider."
+    );
   }
 
   return context;
-}
+};

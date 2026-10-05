@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
@@ -11,115 +10,54 @@ import {
   Search,
   Users,
   X,
+  Loader2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 
 import {
-  readRecruiterData,
-  writeRecruiterData,
-  RECRUITER_STORAGE_KEYS,
-} from "../../utils/recruiterStorage";
+  getJobApplications,
+  updateApplicationStatus,
+} from "../../services/applicationService";
 
-const initialApplicants = [
-  {
-    id: 1,
-    name: "Rahul Verma",
-    email: "rahul@example.com",
-    job: "Junior Backend Developer",
-    experience: "1 year",
-    appliedOn: "2026-10-02",
-    status: "Applied",
-    skills: ["Node.js", "Express", "MongoDB"],
-    resumeUrl: "",
-  },
-  {
-    id: 2,
-    name: "Priya Sharma",
-    email: "priya@example.com",
-    job: "MERN Stack Developer",
-    experience: "2 years",
-    appliedOn: "2026-10-01",
-    status: "Shortlisted",
-    skills: ["React", "Node.js", "MongoDB"],
-    resumeUrl: "",
-  },
-  {
-    id: 3,
-    name: "Aman Singh",
-    email: "aman@example.com",
-    job: "Junior Backend Developer",
-    experience: "Fresher",
-    appliedOn: "2026-09-30",
-    status: "Interview",
-    skills: ["JavaScript", "Node.js", "REST API"],
-    resumeUrl: "",
-  },
-  {
-    id: 4,
-    name: "Neha Gupta",
-    email: "neha@example.com",
-    job: "Frontend Developer Intern",
-    experience: "Fresher",
-    appliedOn: "2026-09-29",
-    status: "Rejected",
-    skills: ["HTML", "CSS", "React"],
-    resumeUrl: "",
-  },
-  {
-    id: 5,
-    name: "Vikram Yadav",
-    email: "vikram@example.com",
-    job: "MERN Stack Developer",
-    experience: "3 years",
-    appliedOn: "2026-09-27",
-    status: "Applied",
-    skills: ["React", "Express", "MongoDB"],
-    resumeUrl: "",
-  },
-  {
-    id: 6,
-    name: "Ananya Mehta",
-    email: "ananya@example.com",
-    job: "Junior Backend Developer",
-    experience: "1 year",
-    appliedOn: "2026-09-25",
-    status: "Shortlisted",
-    skills: ["Node.js", "JWT", "MongoDB"],
-    resumeUrl: "",
-  },
-];
 
 const statusOptions = [
-  "Applied",
-  "Shortlisted",
-  "Interview",
-  "Rejected",
-  "Hired",
+  "PENDING",
+  "REVIEWING",
+  "SHORTLISTED",
+  "REJECTED",
+  "ACCEPTED",
 ];
 
 const filters = ["All", ...statusOptions];
 
 const statusStyles = {
-  Applied: "bg-blue-50 text-blue-700",
-  Shortlisted: "bg-violet-50 text-violet-700",
-  Interview: "bg-amber-50 text-amber-700",
-  Rejected: "bg-red-50 text-red-700",
-  Hired: "bg-emerald-50 text-emerald-700",
+  PENDING: "bg-blue-50 text-blue-700",
+  REVIEWING: "bg-amber-50 text-amber-700",
+  SHORTLISTED: "bg-violet-50 text-violet-700",
+  REJECTED: "bg-red-50 text-red-700",
+  ACCEPTED: "bg-emerald-50 text-emerald-700",
 };
 
+const inputClass =
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
+
 function getInitials(name = "") {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "A"
+  );
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "—";
+function formatDate(value) {
+  if (!value) return "—";
 
-  const date = new Date(`${dateString}T12:00:00`);
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) return "—";
 
@@ -128,6 +66,95 @@ function formatDate(dateString) {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatEnum(value) {
+  if (!value) return "—";
+
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getApiErrorMessage(error, fallback) {
+  const responseData = error?.response?.data;
+
+  if (responseData?.errors?.length > 0) {
+    return responseData.errors
+      .map((item) => item.message)
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return responseData?.message || fallback;
+}
+
+function getApplicantName(application) {
+  return (
+    application?.applicant?.name ||
+    application?.user?.name ||
+    application?.applicantName ||
+    "Unknown applicant"
+  );
+}
+
+function getApplicantEmail(application) {
+  return (
+    application?.applicant?.email ||
+    application?.user?.email ||
+    application?.applicantEmail ||
+    "No email available"
+  );
+}
+
+function getApplicantSkills(application) {
+  const skills =
+    application?.applicant?.skills ||
+    application?.user?.skills ||
+    application?.skills ||
+    [];
+
+  return Array.isArray(skills) ? skills : [];
+}
+
+function getJobTitle(application) {
+  return (
+    application?.job?.title ||
+    application?.jobTitle ||
+    "Job not available"
+  );
+}
+
+function normalizeApplication(application) {
+  const applicant =
+    application?.applicant || application?.user || application?.applicantId;
+
+  return {
+    ...application,
+    id: application?._id || application?.id,
+    name: getApplicantName(application),
+    email: getApplicantEmail(application),
+    job: getJobTitle(application),
+    skills: getApplicantSkills(application),
+    resumeUrl:
+      application?.resumeUrl ||
+      application?.applicant?.resumeUrl ||
+      application?.user?.resumeUrl ||
+      "",
+    coverLetter: application?.coverLetter || "",
+    experience:
+      application?.applicant?.experience?.length > 0
+        ? `${application.applicant.experience.length} experience entries`
+        : "Not specified",
+    appliedOn:
+      application?.createdAt ||
+      application?.appliedOn ||
+      application?.applicationDate ||
+      null,
+    status: application?.status || "PENDING",
+    applicant,
+  };
 }
 
 function StatCard({ title, value, icon: Icon, color }) {
@@ -150,7 +177,7 @@ function StatCard({ title, value, icon: Icon, color }) {
   );
 }
 
-function ApplicantRow({ applicant, onStatusChange, onView }) {
+function ApplicantRow({ applicant, onStatusChange, onView, updatingId }) {
   return (
     <tr className="transition hover:bg-slate-50/80">
       <td className="px-5 py-5">
@@ -177,22 +204,25 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 
       <td className="min-w-52 px-5 py-5">
         <p className="font-medium text-slate-800">{applicant.job}</p>
-
         <p className="mt-1 text-xs text-slate-500">
-          {applicant.experience} experience
+          {applicant.experience}
         </p>
       </td>
 
       <td className="min-w-52 px-5 py-5">
         <div className="flex flex-wrap gap-1.5">
-          {(applicant.skills || []).map((skill) => (
-            <span
-              key={skill}
-              className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600"
-            >
-              {skill}
-            </span>
-          ))}
+          {applicant.skills.length > 0 ? (
+            applicant.skills.slice(0, 6).map((skill) => (
+              <span
+                key={skill}
+                className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600"
+              >
+                {skill}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs text-slate-400">No skills listed</span>
+          )}
         </div>
       </td>
 
@@ -203,10 +233,10 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
       <td className="px-5 py-5">
         <span
           className={`inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
-            statusStyles[applicant.status] || statusStyles.Applied
+            statusStyles[applicant.status] || statusStyles.PENDING
           }`}
         >
-          {applicant.status}
+          {formatEnum(applicant.status)}
         </span>
       </td>
 
@@ -224,14 +254,15 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
           <select
             aria-label={`Update status for ${applicant.name}`}
             value={applicant.status}
+            disabled={updatingId === applicant.id}
             onChange={(event) =>
               onStatusChange(applicant.id, event.target.value)
             }
-            className="h-9 max-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400"
+            className="h-9 max-w-40 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {formatEnum(status)}
               </option>
             ))}
           </select>
@@ -242,103 +273,136 @@ function ApplicantRow({ applicant, onStatusChange, onView }) {
 }
 
 export default function Applicants() {
-  const [applicants, setApplicants] = useState(() =>
-    readRecruiterData(
-      RECRUITER_STORAGE_KEYS.applicants,
-      initialApplicants,
-    ),
-  );
-
+  const [applications, setApplications] = useState([]);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("All jobs");
   const [selectedApplicant, setSelectedApplicant] = useState(null);
-  const [notice, setNotice] = useState("");
 
-  // Save applicant changes locally.
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  async function loadApplications() {
+    try {
+      setLoading(true);
+
+      const response = await getJobApplications();
+
+      const backendApplications = Array.isArray(response?.data)
+        ? response.data
+        : [];
+
+      setApplications(backendApplications.map(normalizeApplication));
+    } catch (error) {
+      const message = getApiErrorMessage(
+        error,
+        "Unable to load candidate applications.",
+      );
+
+      setApplications([]);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    writeRecruiterData(
-      RECRUITER_STORAGE_KEYS.applicants,
-      applicants,
-    );
-  }, [applicants]);
-
-  // Clear the success message automatically.
-  useEffect(() => {
-    if (!notice) return undefined;
-
-    const timeoutId = window.setTimeout(() => {
-      setNotice("");
-    }, 3000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [notice]);
+    loadApplications();
+  }, []);
 
   const jobOptions = useMemo(
-    () => [...new Set(applicants.map((applicant) => applicant.job))],
-    [applicants],
+    () => [...new Set(applications.map((application) => application.job))],
+    [applications],
   );
 
   const stats = useMemo(
     () => ({
-      total: applicants.length,
-      shortlisted: applicants.filter(
-        (applicant) => applicant.status === "Shortlisted",
+      total: applications.length,
+      shortlisted: applications.filter(
+        (application) => application.status === "SHORTLISTED",
       ).length,
-      interviews: applicants.filter(
-        (applicant) => applicant.status === "Interview",
+      interviews: applications.filter(
+        (application) => application.status === "REVIEWING",
       ).length,
-      hired: applicants.filter(
-        (applicant) => applicant.status === "Hired",
+      hired: applications.filter(
+        (application) => application.status === "ACCEPTED",
       ).length,
     }),
-    [applicants],
+    [applications],
   );
 
-  const filteredApplicants = useMemo(() => {
+  const filteredApplications = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return applicants.filter((applicant) => {
+    return applications.filter((application) => {
       const matchesStatus =
-        activeFilter === "All" ||
-        applicant.status === activeFilter;
+        activeFilter === "All" || application.status === activeFilter;
 
       const matchesJob =
-        jobFilter === "All jobs" ||
-        applicant.job === jobFilter;
+        jobFilter === "All jobs" || application.job === jobFilter;
 
       const searchableValues = [
-        applicant.name || "",
-        applicant.email || "",
-        applicant.job || "",
-        applicant.experience || "",
-        ...(applicant.skills || []),
+        application.name,
+        application.email,
+        application.job,
+        application.experience,
+        ...application.skills,
       ];
 
-      const matchesSearch = searchableValues.some((value) =>
-        value.toLowerCase().includes(query),
-      );
+      const matchesSearch =
+        !query ||
+        searchableValues.some((value) =>
+          String(value || "").toLowerCase().includes(query),
+        );
 
       return matchesStatus && matchesJob && matchesSearch;
     });
-  }, [applicants, activeFilter, jobFilter, searchQuery]);
+  }, [applications, activeFilter, jobFilter, searchQuery]);
 
-  function updateApplicantStatus(id, status) {
-    const applicant = applicants.find((item) => item.id === id);
-
-    setApplicants((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status } : item,
-      ),
+  async function handleStatusChange(applicationId, status) {
+    const previousApplication = applications.find(
+      (application) => application.id === applicationId,
     );
 
-    setSelectedApplicant((current) =>
-      current?.id === id ? { ...current, status } : current,
-    );
+    if (!previousApplication) return;
 
-    setNotice(
-      `${applicant?.name ?? "Applicant"} status updated to ${status}.`,
-    );
+    try {
+      setUpdatingId(applicationId);
+
+      const response = await updateApplicationStatus(applicationId, status);
+
+      const updatedApplication = normalizeApplication(
+        response?.data || {
+          ...previousApplication,
+          status,
+        },
+      );
+
+      setApplications((current) =>
+        current.map((application) =>
+          application.id === applicationId
+            ? updatedApplication
+            : application,
+        ),
+      );
+
+      setSelectedApplicant((current) =>
+        current?.id === applicationId ? updatedApplication : current,
+      );
+
+      toast.success(
+        `${previousApplication.name} status updated to ${formatEnum(status)}.`,
+      );
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Unable to update application status.",
+        ),
+      );
+    } finally {
+      setUpdatingId(null);
+    }
   }
 
   const statCards = [
@@ -355,7 +419,7 @@ export default function Applicants() {
       color: "bg-violet-50 text-violet-700",
     },
     {
-      title: "Interviews",
+      title: "Under review",
       value: stats.interviews,
       icon: CalendarDays,
       color: "bg-amber-50 text-amber-700",
@@ -371,30 +435,37 @@ export default function Applicants() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-7 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* Page heading */}
-        <div>
-          <p className="text-xs font-bold tracking-[0.18em] text-blue-700">
-            RECRUITER WORKSPACE
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold tracking-[0.18em] text-blue-700">
+              RECRUITER WORKSPACE
+            </p>
 
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Applicants
-          </h1>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Applicants
+            </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Review candidates, manage application statuses and keep
-            your hiring process organized.
-          </p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+              Review candidates, manage application statuses and keep your
+              hiring process organized.
+            </p>
+          </div>
+
+          <Link
+            to="/recruiter/jobs"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <BriefcaseBusiness size={16} />
+            Manage jobs
+          </Link>
         </div>
 
-        {/* Statistics */}
         <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {statCards.map((stat) => (
             <StatCard key={stat.title} {...stat} />
           ))}
         </section>
 
-        {/* Applicant management */}
         <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -404,13 +475,12 @@ export default function Applicants() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  {filteredApplicants.length} applicant
-                  {filteredApplicants.length !== 1 ? "s" : ""} found
+                  {filteredApplications.length} applicant
+                  {filteredApplications.length !== 1 ? "s" : ""} found
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {/* Search candidates */}
                 <div className="relative">
                   <Search
                     size={17}
@@ -420,15 +490,12 @@ export default function Applicants() {
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(event) =>
-                      setSearchQuery(event.target.value)
-                    }
+                    onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search candidates..."
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-64"
+                    className={`${inputClass} pl-10 sm:w-64`}
                   />
                 </div>
 
-                {/* Filter by job */}
                 <div className="relative">
                   <BriefcaseBusiness
                     size={16}
@@ -437,10 +504,8 @@ export default function Applicants() {
 
                   <select
                     value={jobFilter}
-                    onChange={(event) =>
-                      setJobFilter(event.target.value)
-                    }
-                    className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-64"
+                    onChange={(event) => setJobFilter(event.target.value)}
+                    className={`${inputClass} appearance-none pl-10 pr-9 sm:w-64`}
                   >
                     <option value="All jobs">All jobs</option>
 
@@ -459,13 +524,12 @@ export default function Applicants() {
               </div>
             </div>
 
-            {/* Status filters */}
             <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
               {filters.map((filter) => {
                 const count =
                   filter === "All"
-                    ? applicants.length
-                    : applicants.filter(
+                    ? applications.length
+                    : applications.filter(
                         (item) => item.status === filter,
                       ).length;
 
@@ -480,7 +544,7 @@ export default function Applicants() {
                         : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
                     }`}
                   >
-                    {filter}
+                    {filter === "All" ? "All" : formatEnum(filter)}
 
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-xs ${
@@ -497,8 +561,14 @@ export default function Applicants() {
             </div>
           </div>
 
-          {/* Applicant table */}
-          {filteredApplicants.length > 0 ? (
+          {loading ? (
+            <div className="flex min-h-80 items-center justify-center">
+              <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
+                <Loader2 className="animate-spin" size={20} />
+                Loading applications...
+              </div>
+            </div>
+          ) : filteredApplications.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1050px] border-collapse text-left">
                 <thead>
@@ -522,12 +592,13 @@ export default function Applicants() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {filteredApplicants.map((applicant) => (
+                  {filteredApplications.map((application) => (
                     <ApplicantRow
-                      key={applicant.id}
-                      applicant={applicant}
-                      onStatusChange={updateApplicantStatus}
+                      key={application.id}
+                      applicant={application}
+                      onStatusChange={handleStatusChange}
                       onView={setSelectedApplicant}
+                      updatingId={updatingId}
                     />
                   ))}
                 </tbody>
@@ -535,10 +606,7 @@ export default function Applicants() {
             </div>
           ) : (
             <div className="px-5 py-16 text-center">
-              <Users
-                size={30}
-                className="mx-auto text-slate-300"
-              />
+              <Users size={30} className="mx-auto text-slate-300" />
 
               <h3 className="mt-4 font-bold text-slate-900">
                 No applicants found
@@ -564,26 +632,11 @@ export default function Applicants() {
         </section>
 
         <p className="mt-4 text-xs leading-5 text-slate-400">
-          Demo data only. Applicant records are stored in this
-          browser's localStorage, not in the backend yet.
+          Applications are loaded from the backend API and status changes are
+          saved to MongoDB.
         </p>
       </div>
 
-      {/* Status update notification */}
-      {notice && (
-        <div
-          role="status"
-          className="fixed bottom-5 right-4 z-[60] flex max-w-sm items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-800 shadow-xl sm:right-6"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-            <Check size={17} />
-          </span>
-
-          {notice}
-        </div>
-      )}
-
-      {/* Applicant details modal */}
       {selectedApplicant && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
@@ -641,10 +694,10 @@ export default function Applicants() {
                   <span
                     className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                       statusStyles[selectedApplicant.status] ||
-                      statusStyles.Applied
+                      statusStyles.PENDING
                     }`}
                   >
-                    {selectedApplicant.status}
+                    {formatEnum(selectedApplicant.status)}
                   </span>
                 </div>
               </div>
@@ -663,16 +716,6 @@ export default function Applicants() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-xs font-medium text-slate-500">
-                      Experience
-                    </p>
-
-                    <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {selectedApplicant.experience}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">
                       Application date
                     </p>
 
@@ -680,31 +723,54 @@ export default function Applicants() {
                       {formatDate(selectedApplicant.appliedOn)}
                     </p>
                   </div>
-                </div>
 
-                <div>
-                  <p className="text-xs font-medium text-slate-500">
-                    Skills
-                  </p>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Status
+                    </p>
 
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {(selectedApplicant.skills || []).map((skill) => (
-                      <span
-                        key={skill}
-                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {formatEnum(selectedApplicant.status)}
+                    </p>
                   </div>
                 </div>
 
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Skills</p>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedApplicant.skills.length > 0 ? (
+                      selectedApplicant.skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700"
+                        >
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-400">
+                        No skills listed
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {selectedApplicant.coverLetter && (
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Cover letter
+                    </p>
+
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                      {selectedApplicant.coverLetter}
+                    </p>
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-dashed border-slate-300 p-4">
                   <div className="flex items-center gap-3">
-                    <FileText
-                      size={21}
-                      className="text-slate-500"
-                    />
+                    <FileText size={21} className="text-slate-500" />
 
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-800">
@@ -714,7 +780,7 @@ export default function Applicants() {
                       <p className="mt-1 text-xs text-slate-500">
                         {selectedApplicant.resumeUrl
                           ? "Resume available"
-                          : "No resume file attached in demo data"}
+                          : "No resume URL attached"}
                       </p>
                     </div>
 
@@ -743,17 +809,18 @@ export default function Applicants() {
                   <select
                     id="applicant-status"
                     value={selectedApplicant.status}
+                    disabled={updatingId === selectedApplicant.id}
                     onChange={(event) =>
-                      updateApplicantStatus(
+                      handleStatusChange(
                         selectedApplicant.id,
                         event.target.value,
                       )
                     }
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                    className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     {statusOptions.map((status) => (
                       <option key={status} value={status}>
-                        {status}
+                        {formatEnum(status)}
                       </option>
                     ))}
                   </select>

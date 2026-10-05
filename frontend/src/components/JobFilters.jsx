@@ -13,6 +13,10 @@ export default function JobFilters({
 
   return (
     <aside className="rounded-2xl border border-slate-200 bg-white p-5">
+      {/* =========================================================
+          FILTER HEADER
+          ========================================================= */}
+
       <div className="flex items-center justify-between">
         <h3 className="font-extrabold text-[#172b4d]">
           Filters
@@ -24,8 +28,15 @@ export default function JobFilters({
         />
       </div>
 
+      {/* =========================================================
+          SEARCH
+          ========================================================= */}
+
       <div className="mt-6">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <label
+          htmlFor="job-search"
+          className="text-xs font-bold uppercase tracking-wide text-slate-400"
+        >
           Search
         </label>
 
@@ -36,6 +47,8 @@ export default function JobFilters({
           />
 
           <input
+            id="job-search"
+            type="text"
             value={filters.search}
             onChange={(event) =>
               updateFilter("search", event.target.value)
@@ -46,56 +59,83 @@ export default function JobFilters({
         </div>
       </div>
 
+      {/* =========================================================
+          LOCATION
+          ========================================================= */}
+
       <div className="mt-6">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <label
+          htmlFor="job-location"
+          className="text-xs font-bold uppercase tracking-wide text-slate-400"
+        >
           Location
         </label>
 
         <input
+          id="job-location"
+          type="text"
           value={filters.location}
           onChange={(event) =>
             updateFilter("location", event.target.value)
           }
           placeholder="e.g. Gurgaon"
-          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-[#0066b3] focus:bg-white"
+          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#0066b3] focus:bg-white"
         />
       </div>
 
+      {/* =========================================================
+          JOB TYPE
+          ========================================================= */}
+
       <div className="mt-6">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <label
+          htmlFor="job-type"
+          className="text-xs font-bold uppercase tracking-wide text-slate-400"
+        >
           Job Type
         </label>
 
         <select
+          id="job-type"
           value={filters.type}
           onChange={(event) =>
             updateFilter("type", event.target.value)
           }
-          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-[#0066b3] focus:bg-white"
+          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#0066b3] focus:bg-white"
         >
           <option value="">All Types</option>
-          <option value="Full Time">Full Time</option>
-          <option value="Internship">Internship</option>
-          <option value="Part Time">Part Time</option>
+          <option value="FULL_TIME">Full Time</option>
+          <option value="PART_TIME">Part Time</option>
+          <option value="CONTRACT">Contract</option>
+          <option value="INTERNSHIP">Internship</option>
+          <option value="FREELANCE">Freelance</option>
         </select>
       </div>
 
+      {/* =========================================================
+          WORK MODE
+          ========================================================= */}
+
       <div className="mt-6">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <label
+          htmlFor="work-mode"
+          className="text-xs font-bold uppercase tracking-wide text-slate-400"
+        >
           Work Mode
         </label>
 
         <select
+          id="work-mode"
           value={filters.workMode}
           onChange={(event) =>
             updateFilter("workMode", event.target.value)
           }
-          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-[#0066b3] focus:bg-white"
+          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#0066b3] focus:bg-white"
         >
           <option value="">All Modes</option>
-          <option value="Remote">Remote</option>
-          <option value="Hybrid">Hybrid</option>
-          <option value="On-site">On-site</option>
+          <option value="REMOTE">Remote</option>
+          <option value="HYBRID">Hybrid</option>
+          <option value="ONSITE">On-site</option>
         </select>
       </div>
     </aside>

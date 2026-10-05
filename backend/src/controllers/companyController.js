@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
+
 const Company = require("../models/Company");
 const Job = require("../models/Job");
+
+// ============================================
+// HELPERS
+// ============================================
 
 const isAdmin = (user) =>
   ["ADMIN", "SUPER_ADMIN"].includes(user.role);
@@ -25,6 +30,10 @@ const isValidHttpUrl = (value) => {
   }
 };
 
+// ============================================
+// VALIDATE COMPANY PAYLOAD
+// ============================================
+
 const validateCompanyPayload = (body) => {
   const errors = [];
 
@@ -36,13 +45,13 @@ const validateCompanyPayload = (body) => {
 
       if (name.length < 2) {
         errors.push(
-          "Company name must be at least 2 characters."
+          "Company name must be at least 2 characters.",
         );
       }
 
       if (name.length > 150) {
         errors.push(
-          "Company name cannot exceed 150 characters."
+          "Company name cannot exceed 150 characters.",
         );
       }
     }
@@ -54,7 +63,7 @@ const validateCompanyPayload = (body) => {
       body.description.length > 5000
     ) {
       errors.push(
-        "Description must be a string and cannot exceed 5000 characters."
+        "Description must be a string and cannot exceed 5000 characters.",
       );
     }
   }
@@ -66,7 +75,7 @@ const validateCompanyPayload = (body) => {
       !isValidHttpUrl(body.website.trim())
     ) {
       errors.push(
-        "Website must be a valid HTTP or HTTPS URL."
+        "Website must be a valid HTTP or HTTPS URL.",
       );
     }
   }
@@ -78,7 +87,7 @@ const validateCompanyPayload = (body) => {
       !isValidHttpUrl(body.logo.trim())
     ) {
       errors.push(
-        "Logo must be a valid HTTP or HTTPS URL."
+        "Logo must be a valid HTTP or HTTPS URL.",
       );
     }
   }
@@ -89,7 +98,7 @@ const validateCompanyPayload = (body) => {
       body.industry.trim().length > 100
     ) {
       errors.push(
-        "Industry cannot exceed 100 characters."
+        "Industry cannot exceed 100 characters.",
       );
     }
   }
@@ -100,12 +109,16 @@ const validateCompanyPayload = (body) => {
       body.location.trim().length > 200
     ) {
       errors.push(
-        "Location cannot exceed 200 characters."
+        "Location cannot exceed 200 characters.",
       );
     }
   }
 
-  if (body.foundedYear !== undefined && body.foundedYear !== null) {
+  if (
+    body.foundedYear !== undefined &&
+    body.foundedYear !== null &&
+    body.foundedYear !== ""
+  ) {
     const year = Number(body.foundedYear);
     const currentYear = new Date().getFullYear();
 
@@ -115,7 +128,7 @@ const validateCompanyPayload = (body) => {
       year > currentYear
     ) {
       errors.push(
-        `Founded year must be between 1800 and ${currentYear}.`
+        `Founded year must be between 1800 and ${currentYear}.`,
       );
     }
   }
@@ -123,28 +136,32 @@ const validateCompanyPayload = (body) => {
   return errors;
 };
 
+// ============================================
 // GET /api/companies
-// Public: list and search companies with pagination.
+// PUBLIC
+// List/search companies
+// ============================================
+
 const getCompanies = async (req, res, next) => {
   try {
     const page = Math.max(
       1,
-      parseInt(req.query.page, 10) || 1
+      parseInt(req.query.page, 10) || 1,
     );
 
     const limit = Math.min(
       50,
       Math.max(
         1,
-        parseInt(req.query.limit, 10) || 10
-      )
+        parseInt(req.query.limit, 10) || 10,
+      ),
     );
 
     const filter = {};
 
     if (req.query.search?.trim()) {
       const search = escapeRegex(
-        req.query.search.trim()
+        req.query.search.trim(),
       );
 
       filter.$or = [
@@ -196,8 +213,42 @@ const getCompanies = async (req, res, next) => {
   }
 };
 
+// ============================================
+// GET /api/companies/my
+// PROTECTED
+// Get currently logged-in user's company
+// ============================================
+
+const getMyCompany = async (req, res, next) => {
+  try {
+    const company = await Company.findOne({
+      createdBy: req.user._id,
+    }).lean();
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: "Company profile not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        company,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================
 // GET /api/companies/:id
-// Public: get company details.
+// PUBLIC
+// Get company details
+// ============================================
+
 const getCompanyById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -209,8 +260,10 @@ const getCompanyById = async (req, res, next) => {
       });
     }
 
-    const company = await Company.findById(id)
-      .populate("createdBy", "name");
+    const company = await Company.findById(id).populate(
+      "createdBy",
+      "name",
+    );
 
     if (!company) {
       return res.status(404).json({
@@ -228,8 +281,12 @@ const getCompanyById = async (req, res, next) => {
   }
 };
 
+// ============================================
 // GET /api/companies/:id/jobs
-// Public: list open jobs belonging to this company.
+// PUBLIC
+// Get open jobs for company
+// ============================================
+
 const getCompanyJobs = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -254,15 +311,15 @@ const getCompanyJobs = async (req, res, next) => {
 
     const page = Math.max(
       1,
-      parseInt(req.query.page, 10) || 1
+      parseInt(req.query.page, 10) || 1,
     );
 
     const limit = Math.min(
       50,
       Math.max(
         1,
-        parseInt(req.query.limit, 10) || 10
-      )
+        parseInt(req.query.limit, 10) || 10,
+      ),
     );
 
     const filter = {
@@ -274,7 +331,7 @@ const getCompanyJobs = async (req, res, next) => {
       Job.find(filter)
         .populate(
           "company",
-          "name logo industry location companySize"
+          "name logo industry location companySize",
         )
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
@@ -300,8 +357,12 @@ const getCompanyJobs = async (req, res, next) => {
   }
 };
 
+// ============================================
 // POST /api/companies
-// Recruiter/admin: create a company profile.
+// PROTECTED
+// Create company
+// ============================================
+
 const createCompany = async (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== "object") {
@@ -340,6 +401,24 @@ const createCompany = async (req, res, next) => {
         success: false,
         message: "Company name is required.",
       });
+    }
+
+    // Recruiter should have only one company profile.
+    if (req.user.role === "RECRUITER") {
+      const existingCompany = await Company.findOne({
+        createdBy: req.user._id,
+      }).lean();
+
+      if (existingCompany) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "You already have a company profile. Update your existing company instead.",
+          data: {
+            company: existingCompany,
+          },
+        });
+      }
     }
 
     const payload = {
@@ -398,15 +477,21 @@ const createCompany = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       message: "Company created successfully.",
-      data: company,
+      data: {
+        company,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+// ============================================
 // PUT /api/companies/:id
-// Owner/admin: update company profile.
+// PROTECTED
+// Owner/admin update
+// ============================================
+
 const updateCompany = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -467,6 +552,8 @@ const updateCompany = async (req, res, next) => {
       "foundedYear",
     ];
 
+    const previousName = company.name;
+
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         let value = req.body[field];
@@ -506,31 +593,41 @@ const updateCompany = async (req, res, next) => {
 
     await company.save();
 
-    // Keep Job.companyName snapshot synchronized
-    // when the company name changes.
-    if (req.body.name !== undefined) {
+    // Keep Job.companyName synchronized.
+    if (
+      req.body.name !== undefined &&
+      previousName !== company.name
+    ) {
       await Job.updateMany(
-        { company: company._id },
+        {
+          company: company._id,
+        },
         {
           $set: {
             companyName: company.name,
           },
-        }
+        },
       );
     }
 
     return res.status(200).json({
       success: true,
       message: "Company updated successfully.",
-      data: company,
+      data: {
+        company,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+// ============================================
 // DELETE /api/companies/:id
-// Owner/admin: delete only if no jobs reference this company.
+// PROTECTED
+// Owner/admin delete
+// ============================================
+
 const deleteCompany = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -586,8 +683,13 @@ const deleteCompany = async (req, res, next) => {
   }
 };
 
+// ============================================
+// EXPORTS
+// ============================================
+
 module.exports = {
   getCompanies,
+  getMyCompany,
   getCompanyById,
   getCompanyJobs,
   createCompany,
