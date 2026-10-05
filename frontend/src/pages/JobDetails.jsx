@@ -6,18 +6,22 @@ import {
   Building2,
   CheckCircle2,
   Clock3,
+  FileText,
+  Loader2,
   MapPin,
+  Send,
   Users,
+  X,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { getJobById } from "../services/jobService";
+import { createApplication } from "../services/applicationService";
+import { useAuth } from "../context/AuthContext";
 
 function formatEmploymentType(type) {
-  if (!type) {
-    return "Not specified";
-  }
+  if (!type) return "Not specified";
 
   return type
     .replaceAll("_", " ")
@@ -26,9 +30,7 @@ function formatEmploymentType(type) {
 }
 
 function formatExperienceLevel(level) {
-  if (!level) {
-    return "Not specified";
-  }
+  if (!level) return "Not specified";
 
   return level
     .replaceAll("_", " ")
@@ -37,9 +39,7 @@ function formatExperienceLevel(level) {
 }
 
 function formatWorkplaceType(type) {
-  if (!type) {
-    return "Not specified";
-  }
+  if (!type) return "Not specified";
 
   return type
     .replaceAll("_", " ")
@@ -48,15 +48,10 @@ function formatWorkplaceType(type) {
 }
 
 function formatSalary(min, max) {
-  if (min == null && max == null) {
-    return "Salary not disclosed";
-  }
+  if (min == null && max == null) return "Salary not disclosed";
 
   const formatAmount = (amount) => {
-    if (amount == null) {
-      return "";
-    }
-
+    if (amount == null) return "";
     return `₹${Number(amount).toLocaleString("en-IN")}`;
   };
 
@@ -64,23 +59,17 @@ function formatSalary(min, max) {
     return `${formatAmount(min)} - ${formatAmount(max)}`;
   }
 
-  if (min != null) {
-    return `From ${formatAmount(min)}`;
-  }
+  if (min != null) return `From ${formatAmount(min)}`;
 
   return `Up to ${formatAmount(max)}`;
 }
 
 function formatDate(date) {
-  if (!date) {
-    return "Not specified";
-  }
+  if (!date) return "Not specified";
 
   const parsedDate = new Date(date);
 
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "Not specified";
-  }
+  if (Number.isNaN(parsedDate.getTime())) return "Not specified";
 
   return parsedDate.toLocaleDateString("en-IN", {
     day: "numeric",
@@ -89,16 +78,34 @@ function formatDate(date) {
   });
 }
 
+function getApiErrorMessage(error, fallback) {
+  const responseData = error?.response?.data;
+
+  if (responseData?.errors?.length > 0) {
+    return responseData.errors
+      .map((item) => item.message)
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return responseData?.message || fallback;
+}
+
 export default function JobDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /*
-   * Fetch job details from backend.
-   */
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [resumeUrl, setResumeUrl] = useState("");
+  const [coverLetter, setCoverLetter] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [applicationSubmitted, setApplicationSubmitted] = useState(false);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -109,19 +116,16 @@ export default function JobDetails() {
 
         const response = await getJobById(id);
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setJob(response?.data || null);
       } catch (err) {
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
-        const message =
-          err?.response?.data?.message ||
-          "Unable to load this job.";
+        const message = getApiErrorMessage(
+          err,
+          "Unable to load this job.",
+        );
 
         setError(message);
         setJob(null);
@@ -144,9 +148,12 @@ export default function JobDetails() {
     };
   }, [id]);
 
-  /*
-   * Loading state.
-   */
+  useEffect(() => {
+    if (user?.resumeUrl) {
+      setResumeUrl(user.resumeUrl);
+    }
+  }, [user]);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f6f8fb]">
@@ -167,9 +174,7 @@ export default function JobDetails() {
 
                   <div className="flex-1">
                     <div className="h-8 w-2/3 rounded bg-slate-200" />
-
                     <div className="mt-3 h-4 w-1/3 rounded bg-slate-200" />
-
                     <div className="mt-5 h-4 w-2/3 rounded bg-slate-100" />
                   </div>
                 </div>
@@ -191,17 +196,13 @@ export default function JobDetails() {
             <aside className="lg:sticky lg:top-24 lg:h-fit">
               <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6">
                 <div className="h-4 w-28 rounded bg-slate-200" />
-
                 <div className="mt-3 h-7 w-48 rounded bg-slate-200" />
-
                 <div className="my-6 h-px bg-slate-100" />
-
                 <div className="space-y-5">
                   <div className="h-4 rounded bg-slate-100" />
                   <div className="h-4 rounded bg-slate-100" />
                   <div className="h-4 rounded bg-slate-100" />
                 </div>
-
                 <div className="mt-6 h-12 rounded-xl bg-slate-200" />
               </div>
             </aside>
@@ -211,9 +212,6 @@ export default function JobDetails() {
     );
   }
 
-  /*
-   * Error / not found state.
-   */
   if (error || !job) {
     return (
       <main className="min-h-screen bg-[#f6f8fb]">
@@ -249,26 +247,92 @@ export default function JobDetails() {
     : [];
 
   const companyName =
-    job.companyName ||
-    job.company?.name ||
-    "Company not specified";
+    job.companyName || job.company?.name || "Company not specified";
 
   const companyId =
-    typeof job.company === "object"
-      ? job.company?._id
-      : job.company;
+    typeof job.company === "object" ? job.company?._id : job.company;
 
   const handleApply = () => {
-    toast.success("Application started");
+    if (!isAuthenticated || !user) {
+      toast.error("Please login as a job seeker to apply.");
+
+      navigate("/login", {
+        state: {
+          from: `/jobs/${jobId}`,
+        },
+      });
+
+      return;
+    }
+
+    if (user.role !== "JOB_SEEKER") {
+      toast.error("Only job seekers can apply for jobs.");
+      return;
+    }
+
+    if (applicationSubmitted) {
+      toast("You have already applied for this job.");
+      return;
+    }
+
+    setResumeUrl(user.resumeUrl || "");
+    setCoverLetter("");
+    setApplyModalOpen(true);
+  };
+
+  const submitApplication = async (event) => {
+    event.preventDefault();
+
+    if (!resumeUrl.trim()) {
+      toast.error("Resume URL is required.");
+      return;
+    }
+
+    if (!/^https?:\/\/\S+$/i.test(resumeUrl.trim())) {
+      toast.error("Please enter a valid resume URL.");
+      return;
+    }
+
+    if (coverLetter.trim().length > 5000) {
+      toast.error("Cover letter cannot exceed 5000 characters.");
+      return;
+    }
+
+    try {
+      setApplying(true);
+
+      await createApplication({
+        job: jobId,
+        resumeUrl: resumeUrl.trim(),
+        coverLetter: coverLetter.trim(),
+      });
+
+      setApplyModalOpen(false);
+      setApplicationSubmitted(true);
+
+      toast.success("Application submitted successfully.");
+    } catch (err) {
+      const message = getApiErrorMessage(
+        err,
+        "Unable to submit your application.",
+      );
+
+      if (
+        err?.response?.status === 409 ||
+        message.toLowerCase().includes("already")
+      ) {
+        setApplicationSubmitted(true);
+      }
+
+      toast.error(message);
+    } finally {
+      setApplying(false);
+    }
   };
 
   return (
     <main className="min-h-screen bg-[#f6f8fb]">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* =======================================================
-            BACK LINK
-            ======================================================= */}
-
         <Link
           to="/jobs"
           className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0066b3]"
@@ -278,13 +342,7 @@ export default function JobDetails() {
         </Link>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
-          {/* =====================================================
-              MAIN CONTENT
-              ===================================================== */}
-
           <section>
-            {/* Job header */}
-
             <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
               <div className="flex flex-col gap-5 sm:flex-row">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#0066b3]">
@@ -317,22 +375,16 @@ export default function JobDetails() {
 
                     <span className="flex items-center gap-1.5">
                       <BriefcaseBusiness size={16} />
-                      {formatExperienceLevel(
-                        job.experienceLevel,
-                      )}
+                      {formatExperienceLevel(job.experienceLevel)}
                     </span>
 
                     <span className="flex items-center gap-1.5">
                       <Clock3 size={16} />
-                      {formatEmploymentType(
-                        job.employmentType,
-                      )}
+                      {formatEmploymentType(job.employmentType)}
                     </span>
                   </div>
                 </div>
               </div>
-
-              {/* Skills */}
 
               {skills.length > 0 && (
                 <div className="mt-7 flex flex-wrap gap-2">
@@ -348,21 +400,14 @@ export default function JobDetails() {
               )}
             </div>
 
-            {/* ===================================================
-                DESCRIPTION
-                =================================================== */}
-
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
               <h2 className="text-xl font-black text-[#172b4d]">
                 Job Description
               </h2>
 
               <p className="mt-4 whitespace-pre-line leading-8 text-slate-600">
-                {job.description ||
-                  "No job description has been provided."}
+                {job.description || "No job description has been provided."}
               </p>
-
-              {/* Requirements */}
 
               {requirements.length > 0 && (
                 <>
@@ -388,40 +433,31 @@ export default function JobDetails() {
                 </>
               )}
 
-              {/* Skills-based requirements fallback */}
+              {requirements.length === 0 && skills.length > 0 && (
+                <>
+                  <h3 className="mt-8 font-extrabold text-[#172b4d]">
+                    Required skills
+                  </h3>
 
-              {requirements.length === 0 &&
-                skills.length > 0 && (
-                  <>
-                    <h3 className="mt-8 font-extrabold text-[#172b4d]">
-                      Requirements
-                    </h3>
+                  <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                    {skills.map((skill, index) => (
+                      <li
+                        key={`${skill}-${index}`}
+                        className="flex gap-3"
+                      >
+                        <CheckCircle2
+                          size={18}
+                          className="mt-1 shrink-0 text-[#0066b3]"
+                        />
 
-                    <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                      {skills.map((skill, index) => (
-                        <li
-                          key={`${skill}-${index}`}
-                          className="flex gap-3"
-                        >
-                          <CheckCircle2
-                            size={18}
-                            className="mt-1 shrink-0 text-[#0066b3]"
-                          />
-
-                          <span>
-                            Strong working knowledge of {skill}.
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
+                        <span>{skill}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           </section>
-
-          {/* =====================================================
-              SIDEBAR
-              ===================================================== */}
 
           <aside className="lg:sticky lg:top-24 lg:h-fit">
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -430,108 +466,67 @@ export default function JobDetails() {
               </p>
 
               <p className="mt-2 text-xl font-black text-[#172b4d]">
-                {formatSalary(
-                  job.salaryMin,
-                  job.salaryMax,
-                )}
+                {formatSalary(job.salaryMin, job.salaryMax)}
               </p>
 
               <div className="mt-6 space-y-4 border-y border-slate-100 py-5">
-                {/* Job type */}
-
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-500">
-                    Job type
-                  </span>
-
+                  <span className="text-sm text-slate-500">Job type</span>
                   <span className="text-right text-sm font-bold text-[#172b4d]">
-                    {formatEmploymentType(
-                      job.employmentType,
-                    )}
+                    {formatEmploymentType(job.employmentType)}
                   </span>
                 </div>
 
-                {/* Work mode */}
-
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-500">
-                    Work mode
-                  </span>
-
+                  <span className="text-sm text-slate-500">Work mode</span>
                   <span className="text-right text-sm font-bold text-[#172b4d]">
-                    {formatWorkplaceType(
-                      job.workplaceType,
-                    )}
+                    {formatWorkplaceType(job.workplaceType)}
                   </span>
                 </div>
 
-                {/* Experience */}
-
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-500">
-                    Experience
-                  </span>
-
+                  <span className="text-sm text-slate-500">Experience</span>
                   <span className="text-right text-sm font-bold text-[#172b4d]">
-                    {formatExperienceLevel(
-                      job.experienceLevel,
-                    )}
+                    {formatExperienceLevel(job.experienceLevel)}
                   </span>
                 </div>
 
-                {/* Deadline */}
-
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-500">
-                    Apply by
-                  </span>
-
+                  <span className="text-sm text-slate-500">Apply by</span>
                   <span className="text-right text-sm font-bold text-[#172b4d]">
                     {formatDate(job.applicationDeadline)}
                   </span>
                 </div>
 
-                {/* Vacancies */}
-
                 {job.vacancies != null && (
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-slate-500">
-                      Vacancies
-                    </span>
-
+                    <span className="text-sm text-slate-500">Vacancies</span>
                     <span className="flex items-center gap-1 text-sm font-bold text-[#172b4d]">
                       <Users size={15} />
                       {job.vacancies}
                     </span>
                   </div>
                 )}
-
-                {/* Applicants */}
-
-                {job.applicants != null && (
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-slate-500">
-                      Applicants
-                    </span>
-
-                    <span className="text-sm font-bold text-[#172b4d]">
-                      {job.applicants}
-                    </span>
-                  </div>
-                )}
               </div>
-
-              {/* Apply */}
 
               <button
                 type="button"
                 onClick={handleApply}
-                className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#0066b3] text-sm font-extrabold text-white transition hover:bg-[#005493]"
+                disabled={applicationSubmitted}
+                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0066b3] text-sm font-extrabold text-white transition hover:bg-[#005493] disabled:cursor-not-allowed disabled:bg-emerald-600"
               >
-                Apply Now
+                {applicationSubmitted ? (
+                  <>
+                    <CheckCircle2 size={17} />
+                    Applied
+                  </>
+                ) : (
+                  <>
+                    <Send size={17} />
+                    Apply Now
+                  </>
+                )}
               </button>
-
-              {/* Save */}
 
               <button
                 type="button"
@@ -545,6 +540,148 @@ export default function JobDetails() {
           </aside>
         </div>
       </div>
+
+      {applyModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !applying) {
+              setApplyModalOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="apply-job-title"
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 p-5 sm:p-6">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-[#0066b3]">
+                  JOB APPLICATION
+                </p>
+
+                <h2
+                  id="apply-job-title"
+                  className="mt-2 text-xl font-bold text-slate-900"
+                >
+                  Apply for {job.title}
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {companyName}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setApplyModalOpen(false)}
+                disabled={applying}
+                aria-label="Close application form"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={submitApplication} className="p-5 sm:p-6">
+              <div className="rounded-xl bg-blue-50 p-4">
+                <div className="flex gap-3">
+                  <FileText
+                    size={20}
+                    className="mt-0.5 shrink-0 text-[#0066b3]"
+                  />
+
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">
+                      Resume
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                      Enter a public HTTPS resume URL. Your recruiter will
+                      receive this link with your application.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <label className="mt-5 block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  Resume URL *
+                </span>
+
+                <input
+                  type="url"
+                  value={resumeUrl}
+                  onChange={(event) => setResumeUrl(event.target.value)}
+                  placeholder="https://example.com/my-resume.pdf"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                  required
+                />
+              </label>
+
+              <label className="mt-5 block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  Cover letter
+                </span>
+
+                <textarea
+                  value={coverLetter}
+                  onChange={(event) => setCoverLetter(event.target.value)}
+                  placeholder="Tell the recruiter why you are a good fit for this role..."
+                  rows={7}
+                  maxLength={5000}
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                />
+
+                <p className="mt-1.5 text-right text-xs text-slate-400">
+                  {coverLetter.length}/5000
+                </p>
+              </label>
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs leading-5 text-slate-500">
+                  Applying as{" "}
+                  <span className="font-semibold text-slate-700">
+                    {user?.name}
+                  </span>{" "}
+                  ({user?.email})
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setApplyModalOpen(false)}
+                  disabled={applying}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={applying}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0066b3] px-5 text-sm font-semibold text-white transition hover:bg-[#005493] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {applying ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} />
+                      Submit application
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
