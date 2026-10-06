@@ -1,5 +1,3 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   Bell,
   BellRing,
@@ -13,118 +11,237 @@ import {
   Search,
   Trash2,
   UserRoundCheck,
+  XCircle,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
-const initialNotifications = [
+import {
+  clearReadNotifications,
+  deleteNotification,
+  getMyNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from "../../services/notificationService";
+
+// ============================================
+// FILTERS
+// ============================================
+
+const filters = [
   {
-    id: 1,
-    type: "interview",
-    title: "Interview update",
-    message:
-      "Your application for Senior Frontend Developer has moved to the interview stage.",
-    time: "2 hours ago",
-    date: "Today",
-    read: false,
-    link: "/applications/1",
+    label: "All",
+    value: "All",
   },
   {
-    id: 2,
-    type: "application",
-    title: "Application under review",
-    message:
-      "DigitalCraft Labs is reviewing your application for React Developer.",
-    time: "5 hours ago",
-    date: "Today",
-    read: false,
-    link: "/applications/2",
+    label: "Unread",
+    value: "Unread",
   },
   {
-    id: 3,
-    type: "shortlist",
-    title: "You have been shortlisted",
-    message:
-      "Your profile has been shortlisted for the MERN Stack Developer position.",
-    time: "Yesterday",
-    date: "Yesterday",
-    read: false,
-    link: "/applied-jobs",
-  },
-  {
-    id: 4,
-    type: "job",
-    title: "New jobs match your interests",
-    message:
-      "Explore frontend and React developer opportunities that match your skills.",
-    time: "Yesterday",
-    date: "Yesterday",
-    read: true,
-    link: "/jobs",
-  },
-  {
-    id: 5,
-    type: "application",
-    title: "Application submitted",
-    message:
-      "Your application was submitted successfully. You can track its progress here.",
-    time: "3 days ago",
-    date: "Earlier",
-    read: true,
-    link: "/applied-jobs",
-  },
-  {
-    id: 6,
-    type: "profile",
-    title: "Complete your profile",
-    message:
-      "Add your latest resume and professional experience to improve your profile.",
-    time: "4 days ago",
-    date: "Earlier",
-    read: true,
-    link: "/profile",
+    label: "Read",
+    value: "Read",
   },
 ];
 
+// ============================================
+// NOTIFICATION TYPE CONFIG
+// ============================================
+
 const notificationConfig = {
-  interview: {
+  INTERVIEW: {
     label: "Interview",
     icon: CalendarDays,
     style: "bg-emerald-50 text-emerald-600",
   },
-  application: {
+
+  APPLICATION: {
     label: "Application",
     icon: FileText,
     style: "bg-blue-50 text-blue-600",
   },
-  shortlist: {
+
+  SHORTLIST: {
     label: "Shortlisted",
     icon: UserRoundCheck,
     style: "bg-violet-50 text-violet-600",
   },
-  job: {
+
+  ACCEPTED: {
+    label: "Accepted",
+    icon: CheckCheck,
+    style: "bg-emerald-50 text-emerald-600",
+  },
+
+  REJECTED: {
+    label: "Application update",
+    icon: XCircle,
+    style: "bg-red-50 text-red-600",
+  },
+
+  JOB: {
     label: "Job alert",
     icon: BriefcaseBusiness,
     style: "bg-amber-50 text-amber-600",
   },
-  profile: {
+
+  PROFILE: {
     label: "Profile",
+    icon: UserRoundCheck,
+    style: "bg-slate-100 text-slate-600",
+  },
+
+  SYSTEM: {
+    label: "System",
     icon: Bell,
     style: "bg-slate-100 text-slate-600",
   },
 };
 
+// ============================================
+// DATE FORMATTER
+// ============================================
+
+const formatTime = (dateValue) => {
+  if (!dateValue) {
+    return "";
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
+
+// ============================================
+// DATE GROUP
+// ============================================
+
+const getDateGroup = (dateValue) => {
+  if (!dateValue) {
+    return "Earlier";
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Earlier";
+  }
+
+  const now = new Date();
+
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  const yesterday = new Date(today);
+
+  yesterday.setDate(today.getDate() - 1);
+
+  const notificationDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+
+  if (
+    notificationDate.getTime() ===
+    today.getTime()
+  ) {
+    return "Today";
+  }
+
+  if (
+    notificationDate.getTime() ===
+    yesterday.getTime()
+  ) {
+    return "Yesterday";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+};
+
+// ============================================
+// NOTIFICATIONS PAGE
+// ============================================
+
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [activeFilter, setActiveFilter] = useState("All");
+  const navigate = useNavigate();
+
+  const [notifications, setNotifications] = useState([]);
+
+  const [activeFilter, setActiveFilter] =
+    useState("All");
+
   const [search, setSearch] = useState("");
 
-  const unreadCount = notifications.filter((item) => !item.read).length;
+  const [loading, setLoading] = useState(true);
 
-  const filters = [
-    { label: "All", value: "All" },
-    { label: "Unread", value: "Unread" },
-    { label: "Read", value: "Read" },
-  ];
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  // ============================================
+  // LOAD NOTIFICATIONS
+  // ============================================
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+
+      const response = await getMyNotifications({
+        page: 1,
+        limit: 50,
+      });
+
+      setNotifications(response?.data || []);
+    } catch (error) {
+      console.error(
+        "Failed to load notifications:",
+        error,
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to load notifications.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================
+  // INITIAL LOAD
+  // ============================================
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  // ============================================
+  // UNREAD COUNT
+  // ============================================
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter(
+      (notification) => !notification.read,
+    ).length;
+  }, [notifications]);
+
+  // ============================================
+  // FILTER + SEARCH
+  // ============================================
 
   const filteredNotifications = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -137,64 +254,271 @@ export default function Notifications() {
 
       const matchesSearch =
         !query ||
-        item.title.toLowerCase().includes(query) ||
-        item.message.toLowerCase().includes(query);
+        item.title?.toLowerCase().includes(query) ||
+        item.message?.toLowerCase().includes(query) ||
+        item.type?.toLowerCase().includes(query);
 
       return matchesFilter && matchesSearch;
     });
-  }, [notifications, activeFilter, search]);
+  }, [
+    notifications,
+    activeFilter,
+    search,
+  ]);
+
+  // ============================================
+  // GROUP NOTIFICATIONS BY DATE
+  // ============================================
 
   const groupedNotifications = useMemo(() => {
-    return filteredNotifications.reduce((groups, item) => {
-      if (!groups[item.date]) groups[item.date] = [];
-      groups[item.date].push(item);
-      return groups;
-    }, {});
+    return filteredNotifications.reduce(
+      (groups, item) => {
+        const date = getDateGroup(
+          item.createdAt,
+        );
+
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+
+        groups[date].push(item);
+
+        return groups;
+      },
+      {},
+    );
   }, [filteredNotifications]);
 
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, read: true } : item,
-      ),
-    );
+  // ============================================
+  // OPEN NOTIFICATION
+  // ============================================
 
-    toast.success("Notification marked as read");
+  const handleNotificationClick = async (
+    item,
+  ) => {
+    try {
+      // Mark unread notification as read first.
+      if (!item.read) {
+        await markNotificationAsRead(
+          item._id,
+        );
+
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification._id === item._id
+              ? {
+                  ...notification,
+                  read: true,
+                  readAt:
+                    new Date().toISOString(),
+                }
+              : notification,
+          ),
+        );
+      }
+
+      // Navigate to notification target.
+      if (item.link) {
+        navigate(item.link);
+        return;
+      }
+
+      // Fallback if notification has no link.
+      navigate("/dashboard/notifications");
+    } catch (error) {
+      console.error(
+        "Failed to open notification:",
+        error,
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Unable to open notification.",
+      );
+    }
   };
 
-  const markAllAsRead = () => {
+  // ============================================
+  // MARK ONE AS READ
+  // ============================================
+
+  const handleMarkAsRead = async (
+    event,
+    notificationId,
+  ) => {
+    // Prevent parent notification click.
+    event.stopPropagation();
+
+    try {
+      await markNotificationAsRead(
+        notificationId,
+      );
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification._id === notificationId
+            ? {
+                ...notification,
+                read: true,
+                readAt:
+                  new Date().toISOString(),
+              }
+            : notification,
+        ),
+      );
+
+      toast.success(
+        "Notification marked as read.",
+      );
+    } catch (error) {
+      console.error(
+        "Failed to mark notification as read:",
+        error,
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update notification.",
+      );
+    }
+  };
+
+  // ============================================
+  // MARK ALL AS READ
+  // ============================================
+
+  const handleMarkAllAsRead = async () => {
     if (unreadCount === 0) {
       toast("You're all caught up!");
       return;
     }
 
-    setNotifications((prev) =>
-      prev.map((item) => ({ ...item, read: true })),
-    );
+    try {
+      setActionLoading(true);
 
-    toast.success("All notifications marked as read");
-  };
+      await markAllNotificationsAsRead();
 
-  const deleteNotification = (id) => {
-    setNotifications((prev) => prev.filter((item) => item.id !== id));
-    toast.success("Notification removed");
-  };
+      const now = new Date().toISOString();
 
-  const clearReadNotifications = () => {
-    const readCount = notifications.filter((item) => item.read).length;
+      setNotifications((prev) =>
+        prev.map((notification) => ({
+          ...notification,
+          read: true,
+          readAt:
+            notification.readAt || now,
+        })),
+      );
 
-    if (readCount === 0) {
-      toast("No read notifications to clear");
-      return;
+      toast.success(
+        "All notifications marked as read.",
+      );
+    } catch (error) {
+      console.error(
+        "Failed to mark all notifications as read:",
+        error,
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update notifications.",
+      );
+    } finally {
+      setActionLoading(false);
     }
-
-    setNotifications((prev) => prev.filter((item) => !item.read));
-    toast.success("Read notifications cleared");
   };
+
+  // ============================================
+  // DELETE ONE NOTIFICATION
+  // ============================================
+
+  const handleDeleteNotification = async (
+    event,
+    notificationId,
+  ) => {
+    // Prevent parent notification click.
+    event.stopPropagation();
+
+    try {
+      await deleteNotification(
+        notificationId,
+      );
+
+      setNotifications((prev) =>
+        prev.filter(
+          (notification) =>
+            notification._id !== notificationId,
+        ),
+      );
+
+      toast.success(
+        "Notification removed.",
+      );
+    } catch (error) {
+      console.error(
+        "Failed to delete notification:",
+        error,
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to delete notification.",
+      );
+    }
+  };
+
+  // ============================================
+  // CLEAR READ NOTIFICATIONS
+  // ============================================
+
+  const handleClearReadNotifications =
+    async () => {
+      const hasReadNotifications =
+        notifications.some(
+          (notification) =>
+            notification.read,
+        );
+
+      if (!hasReadNotifications) {
+        toast("No read notifications to clear.");
+        return;
+      }
+
+      try {
+        setActionLoading(true);
+
+        await clearReadNotifications();
+
+        setNotifications((prev) =>
+          prev.filter(
+            (notification) =>
+              !notification.read,
+          ),
+        );
+
+        toast.success(
+          "Read notifications cleared.",
+        );
+      } catch (error) {
+        console.error(
+          "Failed to clear read notifications:",
+          error,
+        );
+
+        toast.error(
+          error?.response?.data?.message ||
+            "Failed to clear notifications.",
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    };
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+      {/* ============================================
+          HEADER
+      ============================================ */}
+
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -208,23 +532,37 @@ export default function Notifications() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                Stay updated on your applications and job opportunities.
+                Stay updated on your applications
+                and job opportunities.
               </p>
             </div>
 
             <button
-              onClick={markAllAsRead}
-              className="inline-flex w-fit items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+              type="button"
+              onClick={handleMarkAllAsRead}
+              disabled={
+                actionLoading ||
+                unreadCount === 0
+              }
+              className="inline-flex w-fit items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCheck size={16} />
+
               Mark all as read
             </button>
           </div>
         </div>
       </header>
 
+      {/* ============================================
+          MAIN
+      ============================================ */}
+
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Summary */}
+        {/* ============================================
+            SUMMARY
+        ============================================ */}
+
         <div className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
             label="Total notifications"
@@ -242,20 +580,31 @@ export default function Notifications() {
 
           <SummaryCard
             label="Read"
-            value={notifications.length - unreadCount}
+            value={
+              notifications.length -
+              unreadCount
+            }
             icon={MailOpen}
             iconStyle="bg-emerald-50 text-emerald-600"
           />
         </div>
 
-        {/* Filters and Search */}
+        {/* ============================================
+            FILTERS + SEARCH
+        ============================================ */}
+
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2 overflow-x-auto">
               {filters.map((filter) => (
                 <button
                   key={filter.value}
-                  onClick={() => setActiveFilter(filter.value)}
+                  type="button"
+                  onClick={() =>
+                    setActiveFilter(
+                      filter.value,
+                    )
+                  }
                   className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition ${
                     activeFilter === filter.value
                       ? "bg-blue-600 text-white"
@@ -263,11 +612,14 @@ export default function Notifications() {
                   }`}
                 >
                   {filter.label}
-                  {filter.value === "Unread" && unreadCount > 0 && (
-                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                      {unreadCount}
-                    </span>
-                  )}
+
+                  {filter.value ===
+                    "Unread" &&
+                    unreadCount > 0 && (
+                      <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                        {unreadCount}
+                      </span>
+                    )}
                 </button>
               ))}
             </div>
@@ -279,8 +631,11 @@ export default function Notifications() {
               />
 
               <input
+                type="text"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Search notifications..."
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50"
               />
@@ -288,86 +643,97 @@ export default function Notifications() {
           </div>
         </section>
 
-        {/* Notification List */}
+        {/* ============================================
+            NOTIFICATION LIST
+        ============================================ */}
+
         <section className="mt-5">
-          {filteredNotifications.length > 0 ? (
+          {loading ? (
+            <LoadingState />
+          ) : filteredNotifications.length >
+            0 ? (
             <div className="space-y-6">
-              {Object.entries(groupedNotifications).map(([date, items]) => (
+              {Object.entries(
+                groupedNotifications,
+              ).map(([date, items]) => (
                 <div key={date}>
                   <h2 className="mb-3 text-sm font-semibold text-slate-500">
                     {date}
                   </h2>
 
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    {items.map((item, index) => (
-                      <NotificationItem
-                        key={item.id}
-                        item={item}
-                        isLast={index === items.length - 1}
-                        onRead={markAsRead}
-                        onDelete={deleteNotification}
-                      />
-                    ))}
+                    {items.map(
+                      (item, index) => (
+                        <NotificationItem
+                          key={item._id}
+                          item={item}
+                          isLast={
+                            index ===
+                            items.length - 1
+                          }
+                          onOpen={
+                            handleNotificationClick
+                          }
+                          onRead={
+                            handleMarkAsRead
+                          }
+                          onDelete={
+                            handleDeleteNotification
+                          }
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                <Bell size={24} />
-              </div>
-
-              <h2 className="mt-4 text-lg font-bold text-slate-900">
-                No notifications found
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-500">
-                Try another filter or search term.
-              </p>
-            </div>
+            <EmptyState
+              hasNotifications={
+                notifications.length > 0
+              }
+            />
           )}
         </section>
 
-        {/* Footer Actions */}
-        {notifications.some((item) => item.read) && (
-          <div className="mt-5 flex justify-end">
-            <button
-              onClick={clearReadNotifications}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 size={15} />
-              Clear read notifications
-            </button>
-          </div>
-        )}
+        {/* ============================================
+            CLEAR READ
+        ============================================ */}
 
-        <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-          <div className="flex items-start gap-3">
-            <Clock3 size={18} className="mt-0.5 shrink-0 text-blue-600" />
-            <p className="text-sm leading-6 text-blue-900">
-              These are sample notifications for the frontend demo. Live
-              application updates and persistent read status will be connected
-              to the backend later.
-            </p>
-          </div>
-        </div>
+        {!loading &&
+          notifications.some(
+            (item) => item.read,
+          ) && (
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={
+                  handleClearReadNotifications
+                }
+                disabled={actionLoading}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={15} />
 
-        <div className="mt-5 text-center">
-          <Link
-            to="/applied-jobs"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
-          >
-            View your applications
-            <Check size={15} />
-          </Link>
-        </div>
+                Clear read notifications
+              </button>
+            </div>
+          )}
       </main>
     </div>
   );
 }
 
-function SummaryCard({ label, value, icon: Icon, iconStyle }) {
+// ============================================
+// SUMMARY CARD
+// ============================================
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  iconStyle,
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">
@@ -381,32 +747,76 @@ function SummaryCard({ label, value, icon: Icon, iconStyle }) {
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
             {label}
           </p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+
+          <p className="mt-1 text-2xl font-bold text-slate-900">
+            {value}
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function NotificationItem({ item, isLast, onRead, onDelete }) {
-  const config = notificationConfig[item.type] || notificationConfig.application;
+// ============================================
+// NOTIFICATION ITEM
+// ============================================
+
+function NotificationItem({
+  item,
+  isLast,
+  onOpen,
+  onRead,
+  onDelete,
+}) {
+  const config =
+    notificationConfig[item.type] ||
+    notificationConfig.SYSTEM;
+
   const Icon = config.icon;
 
   return (
     <article
-      className={`flex flex-col gap-4 p-4 transition sm:flex-row sm:items-start sm:p-5 ${
-        !item.read ? "bg-blue-50/40" : "bg-white"
-      } ${!isLast ? "border-b border-slate-100" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(item)}
+      onKeyDown={(event) => {
+        if (
+          event.key === "Enter" ||
+          event.key === " "
+        ) {
+          event.preventDefault();
+          onOpen(item);
+        }
+      }}
+      className={`group relative flex cursor-pointer flex-col gap-4 p-4 outline-none transition hover:bg-slate-50 focus:bg-slate-50 focus:ring-2 focus:ring-inset focus:ring-blue-500 sm:flex-row sm:items-start sm:p-5 ${
+        !item.read
+          ? "bg-blue-50/40"
+          : "bg-white"
+      } ${
+        !isLast
+          ? "border-b border-slate-100"
+          : ""
+      }`}
     >
+      {/* ==========================================
+          ICON
+      =========================================== */}
+
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${config.style}`}
       >
         <Icon size={19} />
       </div>
 
+      {/* ==========================================
+          CONTENT
+      =========================================== */}
+
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold text-slate-900">{item.title}</h3>
+          <h3 className="font-semibold text-slate-900">
+            {item.title}
+          </h3>
 
           {!item.read && (
             <span className="h-2 w-2 rounded-full bg-blue-600" />
@@ -423,41 +833,95 @@ function NotificationItem({ item, isLast, onRead, onDelete }) {
 
         <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
           <Clock3 size={13} />
-          {item.time}
+
+          {formatTime(item.createdAt)}
         </div>
 
-        <Link
-          to={item.link}
-          onClick={() => {
-            if (!item.read) onRead(item.id);
-          }}
-          className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
-        >
+        {/* ========================================
+            CLICK HINT
+        ========================================= */}
+
+        <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 transition group-hover:gap-2">
           View details
-        </Link>
+          <span aria-hidden="true">→</span>
+        </div>
       </div>
+
+      {/* ==========================================
+          ACTION BUTTONS
+      =========================================== */}
 
       <div className="flex shrink-0 items-center gap-2 sm:ml-2">
         {!item.read && (
           <button
-            onClick={() => onRead(item.id)}
+            type="button"
+            onClick={(event) =>
+              onRead(event, item._id)
+            }
             title="Mark as read"
             aria-label={`Mark ${item.title} as read`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
           >
             <Check size={16} />
           </button>
         )}
 
         <button
-          onClick={() => onDelete(item.id)}
+          type="button"
+          onClick={(event) =>
+            onDelete(event, item._id)
+          }
           title="Delete notification"
           aria-label={`Delete ${item.title}`}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
         >
           <Trash2 size={16} />
         </button>
       </div>
     </article>
+  );
+}
+
+// ============================================
+// LOADING STATE
+// ============================================
+
+function LoadingState() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+      <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+
+      <p className="mt-4 text-sm text-slate-500">
+        Loading notifications...
+      </p>
+    </div>
+  );
+}
+
+// ============================================
+// EMPTY STATE
+// ============================================
+
+function EmptyState({
+  hasNotifications,
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <Bell size={24} />
+      </div>
+
+      <h2 className="mt-4 text-lg font-bold text-slate-900">
+        {hasNotifications
+          ? "No notifications found"
+          : "You're all caught up"}
+      </h2>
+
+      <p className="mt-2 text-sm text-slate-500">
+        {hasNotifications
+          ? "Try another filter or search term."
+          : "New application and account updates will appear here."}
+      </p>
+    </div>
   );
 }

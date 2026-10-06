@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
+
 const Application = require("../models/Application");
 const Job = require("../models/Job");
+const createNotification = require("../utils/createNotification");
 
 const ALLOWED_STATUSES = [
   "PENDING",
@@ -11,52 +13,29 @@ const ALLOWED_STATUSES = [
 ];
 
 const STATUS_TRANSITIONS = {
-  PENDING: [
-    "PENDING",
-    "REVIEWING",
-    "REJECTED",
-  ],
+  PENDING: ["PENDING", "REVIEWING", "REJECTED"],
 
-  REVIEWING: [
-    "REVIEWING",
-    "SHORTLISTED",
-    "REJECTED",
-  ],
+  REVIEWING: ["REVIEWING", "SHORTLISTED", "REJECTED"],
 
-  SHORTLISTED: [
-    "SHORTLISTED",
-    "ACCEPTED",
-    "REJECTED",
-  ],
+  SHORTLISTED: ["SHORTLISTED", "ACCEPTED", "REJECTED"],
 
-  REJECTED: [
-    "REJECTED",
-  ],
+  REJECTED: ["REJECTED"],
 
-  ACCEPTED: [
-    "ACCEPTED",
-  ],
+  ACCEPTED: ["ACCEPTED"],
 };
 
 const MAX_RESUME_URL_LENGTH = 2048;
 const MAX_COVER_LETTER_LENGTH = 5000;
 const MAX_RECRUITER_NOTES_LENGTH = 3000;
 
-const isAdmin = (user) =>
-  ["ADMIN", "SUPER_ADMIN"].includes(user.role);
+const isAdmin = (user) => ["ADMIN", "SUPER_ADMIN"].includes(user.role);
 
 const getPagination = (query) => {
-  const page = Math.max(
-    1,
-    parseInt(query.page, 10) || 1
-  );
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
 
   const limit = Math.min(
     50,
-    Math.max(
-      1,
-      parseInt(query.limit, 10) || 10
-    )
+    Math.max(1, parseInt(query.limit, 10) || 10),
   );
 
   return {
@@ -67,10 +46,7 @@ const getPagination = (query) => {
 };
 
 const isValidHttpUrl = (value) => {
-  if (
-    typeof value !== "string" ||
-    !value.trim()
-  ) {
+  if (typeof value !== "string" || !value.trim()) {
     return false;
   }
 
@@ -81,10 +57,7 @@ const isValidHttpUrl = (value) => {
   try {
     const url = new URL(value.trim());
 
-    return (
-      url.protocol === "http:" ||
-      url.protocol === "https:"
-    );
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
@@ -97,64 +70,46 @@ const isValidHttpUrl = (value) => {
 
 const applyForJob = async (req, res, next) => {
   try {
-    if (
-      !req.body ||
-      typeof req.body !== "object"
-    ) {
+    if (!req.body || typeof req.body !== "object") {
       return res.status(400).json({
         success: false,
-        message:
-          "Request body must be an object.",
+        message: "Request body must be an object.",
       });
     }
 
-    const {
-      jobId,
-      resumeUrl,
-      coverLetter,
-    } = req.body;
+    const { jobId, resumeUrl, coverLetter } = req.body;
 
     // Validate job ID
     if (!mongoose.isValidObjectId(jobId)) {
       return res.status(400).json({
         success: false,
-        message:
-          "A valid jobId is required.",
+        message: "A valid jobId is required.",
       });
     }
 
     // Validate resume URL
-    if (
-      !isValidHttpUrl(resumeUrl)
-    ) {
+    if (!isValidHttpUrl(resumeUrl)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Resume URL must be a valid HTTP or HTTPS URL.",
+        message: "Resume URL must be a valid HTTP or HTTPS URL.",
       });
     }
 
     // Validate cover letter
-    if (
-      coverLetter !== undefined &&
-      typeof coverLetter !== "string"
-    ) {
+    if (coverLetter !== undefined && typeof coverLetter !== "string") {
       return res.status(400).json({
         success: false,
-        message:
-          "Cover letter must be a string.",
+        message: "Cover letter must be a string.",
       });
     }
 
     if (
       typeof coverLetter === "string" &&
-      coverLetter.length >
-        MAX_COVER_LETTER_LENGTH
+      coverLetter.length > MAX_COVER_LETTER_LENGTH
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Cover letter cannot exceed 5000 characters.",
+        message: "Cover letter cannot exceed 5000 characters.",
       });
     }
 
@@ -162,27 +117,20 @@ const applyForJob = async (req, res, next) => {
     const job = await Job.findOne({
       _id: jobId,
       status: "OPEN",
-    }).select(
-      "_id title companyName location applicationDeadline"
-    );
+    }).select("_id title companyName location applicationDeadline");
 
     if (!job) {
       return res.status(404).json({
         success: false,
-        message:
-          "Job not found or applications are closed.",
+        message: "Job not found or applications are closed.",
       });
     }
 
     // Check application deadline
-    if (
-      job.applicationDeadline &&
-      job.applicationDeadline < new Date()
-    ) {
+    if (job.applicationDeadline && job.applicationDeadline < new Date()) {
       return res.status(400).json({
         success: false,
-        message:
-          "The application deadline has passed.",
+        message: "The application deadline has passed.",
       });
     }
 
@@ -191,15 +139,33 @@ const applyForJob = async (req, res, next) => {
       applicant: req.user._id,
       resumeUrl: resumeUrl.trim(),
       coverLetter:
-        typeof coverLetter === "string"
-          ? coverLetter.trim()
-          : "",
+        typeof coverLetter === "string" ? coverLetter.trim() : "",
     });
+
+    // Create notification after successful application.
+    // Notification failure must never make the application fail.
+    try {
+      await createNotification({
+        recipient: req.user._id,
+        type: "APPLICATION",
+        title: "Application submitted",
+        message: `Your application for ${job.title} at ${
+          job.companyName || "this company"
+        } was submitted successfully.`,
+        link: `/dashboard/applications/${application._id}`,
+        relatedApplication: application._id,
+        relatedJob: job._id,
+      });
+    } catch (notificationError) {
+      console.error(
+        "Application notification creation failed:",
+        notificationError.message,
+      );
+    }
 
     return res.status(201).json({
       success: true,
-      message:
-        "Application submitted successfully.",
+      message: "Application submitted successfully.",
       data: application,
     });
   } catch (error) {
@@ -208,8 +174,7 @@ const applyForJob = async (req, res, next) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message:
-          "You have already applied for this job.",
+        message: "You have already applied for this job.",
       });
     }
 
@@ -222,33 +187,22 @@ const applyForJob = async (req, res, next) => {
 // GET /api/applications/my
 // ============================================
 
-const getMyApplications = async (
-  req,
-  res,
-  next
-) => {
+const getMyApplications = async (req, res, next) => {
   try {
-    const {
-      page,
-      limit,
-      skip,
-    } = getPagination(req.query);
+    const { page, limit, skip } = getPagination(req.query);
 
     const filter = {
       applicant: req.user._id,
     };
 
-    const [
-      applications,
-      total,
-    ] = await Promise.all([
+    const [applications, total] = await Promise.all([
       Application.find(filter)
         .select(
-          "job applicant resumeUrl coverLetter status createdAt updatedAt"
+          "job applicant resumeUrl coverLetter status createdAt updatedAt",
         )
         .populate(
           "job",
-          "title companyName location workplaceType employmentType experienceLevel status applicationDeadline createdAt"
+          "title companyName location workplaceType employmentType experienceLevel status applicationDeadline createdAt",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -266,9 +220,7 @@ const getMyApplications = async (
         page,
         limit,
         total,
-        totalPages: Math.ceil(
-          total / limit
-        ),
+        totalPages: Math.ceil(total / limit),
       },
 
       data: applications,
@@ -283,27 +235,19 @@ const getMyApplications = async (
 // GET /api/applications/job/:jobId
 // ============================================
 
-const getJobApplications = async (
-  req,
-  res,
-  next
-) => {
+const getJobApplications = async (req, res, next) => {
   try {
     const { jobId } = req.params;
 
-    if (
-      !mongoose.isValidObjectId(jobId)
-    ) {
+    if (!mongoose.isValidObjectId(jobId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid job ID.",
       });
     }
 
-    const job = await Job.findById(
-      jobId
-    ).select(
-      "_id title companyName location createdBy"
+    const job = await Job.findById(jobId).select(
+      "_id title companyName location createdBy",
     );
 
     if (!job) {
@@ -314,25 +258,16 @@ const getJobApplications = async (
     }
 
     const ownsJob =
-      job.createdBy.toString() ===
-      req.user._id.toString();
+      job.createdBy.toString() === req.user._id.toString();
 
-    if (
-      !ownsJob &&
-      !isAdmin(req.user)
-    ) {
+    if (!ownsJob && !isAdmin(req.user)) {
       return res.status(403).json({
         success: false,
-        message:
-          "You cannot view applications for this job.",
+        message: "You cannot view applications for this job.",
       });
     }
 
-    const {
-      page,
-      limit,
-      skip,
-    } = getPagination(req.query);
+    const { page, limit, skip } = getPagination(req.query);
 
     const filter = {
       job: job._id,
@@ -340,41 +275,30 @@ const getJobApplications = async (
 
     // Optional status filter
     if (req.query.status) {
-      const status =
-        req.query.status
-          .trim()
-          .toUpperCase();
+      const status = req.query.status.trim().toUpperCase();
 
-      if (
-        !ALLOWED_STATUSES.includes(
-          status
-        )
-      ) {
+      if (!ALLOWED_STATUSES.includes(status)) {
         return res.status(400).json({
           success: false,
-          message:
-            "Invalid application status filter.",
+          message: "Invalid application status filter.",
         });
       }
 
       filter.status = status;
     }
 
-    const [
-      applications,
-      total,
-    ] = await Promise.all([
+    const [applications, total] = await Promise.all([
       Application.find(filter)
         .select(
-          "job applicant resumeUrl coverLetter status recruiterNotes createdAt updatedAt"
+          "job applicant resumeUrl coverLetter status recruiterNotes createdAt updatedAt",
         )
         .populate(
           "applicant",
-          "name email phone profilePhoto headline location skills resumeUrl linkedinUrl portfolioUrl"
+          "name email phone profilePhoto headline location skills resumeUrl linkedinUrl portfolioUrl",
         )
         .populate(
           "job",
-          "title companyName location workplaceType employmentType experienceLevel status applicationDeadline"
+          "title companyName location workplaceType employmentType experienceLevel status applicationDeadline",
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -392,9 +316,7 @@ const getJobApplications = async (
         page,
         limit,
         total,
-        totalPages: Math.ceil(
-          total / limit
-        ),
+        totalPages: Math.ceil(total / limit),
       },
 
       data: applications,
@@ -409,34 +331,23 @@ const getJobApplications = async (
 // PATCH /api/applications/:id/status
 // ============================================
 
-const updateApplicationStatus = async (
-  req,
-  res,
-  next
-) => {
+const updateApplicationStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      status,
-      recruiterNotes,
-    } = req.body || {};
+
+    const { status, recruiterNotes } = req.body || {};
 
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid application ID.",
+        message: "Invalid application ID.",
       });
     }
 
-    if (
-      status === undefined &&
-      recruiterNotes === undefined
-    ) {
+    if (status === undefined && recruiterNotes === undefined) {
       return res.status(400).json({
         success: false,
-        message:
-          "Provide status or recruiterNotes to update.",
+        message: "Provide status or recruiterNotes to update.",
       });
     }
 
@@ -444,28 +355,19 @@ const updateApplicationStatus = async (
     let normalizedStatus;
 
     if (status !== undefined) {
-      if (
-        typeof status !== "string"
-      ) {
+      if (typeof status !== "string") {
         return res.status(400).json({
           success: false,
-          message:
-            "Application status must be a string.",
+          message: "Application status must be a string.",
         });
       }
 
-      normalizedStatus =
-        status.trim().toUpperCase();
+      normalizedStatus = status.trim().toUpperCase();
 
-      if (
-        !ALLOWED_STATUSES.includes(
-          normalizedStatus
-        )
-      ) {
+      if (!ALLOWED_STATUSES.includes(normalizedStatus)) {
         return res.status(400).json({
           success: false,
-          message:
-            "Invalid application status.",
+          message: "Invalid application status.",
         });
       }
     }
@@ -477,79 +379,59 @@ const updateApplicationStatus = async (
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "recruiterNotes must be a string.",
+        message: "recruiterNotes must be a string.",
       });
     }
 
     if (
       typeof recruiterNotes === "string" &&
-      recruiterNotes.length >
-        MAX_RECRUITER_NOTES_LENGTH
+      recruiterNotes.length > MAX_RECRUITER_NOTES_LENGTH
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Recruiter notes cannot exceed 3000 characters.",
+        message: "Recruiter notes cannot exceed 3000 characters.",
       });
     }
 
-    const application =
-      await Application.findById(id);
+    const application = await Application.findById(id);
 
     if (!application) {
       return res.status(404).json({
         success: false,
-        message:
-          "Application not found.",
+        message: "Application not found.",
       });
     }
 
-    const job = await Job.findById(
-      application.job
-    ).select(
-      "_id createdBy status"
+    const job = await Job.findById(application.job).select(
+      "_id createdBy status",
     );
 
     if (!job) {
       return res.status(404).json({
         success: false,
-        message:
-          "Associated job not found.",
+        message: "Associated job not found.",
       });
     }
 
     const ownsJob =
-      job.createdBy.toString() ===
-      req.user._id.toString();
+      job.createdBy.toString() === req.user._id.toString();
 
-    if (
-      !ownsJob &&
-      !isAdmin(req.user)
-    ) {
+    if (!ownsJob && !isAdmin(req.user)) {
       return res.status(403).json({
         success: false,
-        message:
-          "You cannot manage this application.",
+        message: "You cannot manage this application.",
       });
     }
 
     // Prevent invalid status transitions.
     if (
       normalizedStatus !== undefined &&
-      normalizedStatus !==
-        application.status
+      normalizedStatus !== application.status
     ) {
       const allowedNextStatuses =
-        STATUS_TRANSITIONS[
-          application.status
-        ] || [];
+        STATUS_TRANSITIONS[application.status] || [];
 
-      if (
-        !allowedNextStatuses.includes(
-          normalizedStatus
-        )
-      ) {
+      if (!allowedNextStatuses.includes(normalizedStatus)) {
         return res.status(400).json({
           success: false,
           message: `Application cannot move from ${application.status} to ${normalizedStatus}.`,
@@ -557,26 +439,82 @@ const updateApplicationStatus = async (
       }
     }
 
-    if (
-      normalizedStatus !== undefined
-    ) {
-      application.status =
-        normalizedStatus;
+    // Store old status before changing it.
+    const previousStatus = application.status;
+
+    if (normalizedStatus !== undefined) {
+      application.status = normalizedStatus;
     }
 
-    if (
-      recruiterNotes !== undefined
-    ) {
-      application.recruiterNotes =
-        recruiterNotes.trim();
+    if (recruiterNotes !== undefined) {
+      application.recruiterNotes = recruiterNotes.trim();
     }
 
     await application.save();
 
+    // ============================================
+    // CREATE STATUS CHANGE NOTIFICATION
+    // ============================================
+
+    if (
+      normalizedStatus !== undefined &&
+      previousStatus !== normalizedStatus
+    ) {
+      const statusNotificationMap = {
+        REVIEWING: {
+          type: "APPLICATION",
+          title: "Application under review",
+          message: "A recruiter is reviewing your application.",
+        },
+
+        SHORTLISTED: {
+          type: "SHORTLIST",
+          title: "You have been shortlisted",
+          message:
+            "Your application has been shortlisted by the recruiter.",
+        },
+
+        REJECTED: {
+          type: "REJECTED",
+          title: "Application update",
+          message:
+            "Your application was not selected for the next stage.",
+        },
+
+        ACCEPTED: {
+          type: "ACCEPTED",
+          title: "Application accepted",
+          message:
+            "Congratulations! Your application has been accepted.",
+        },
+      };
+
+      const notification =
+        statusNotificationMap[normalizedStatus];
+
+      if (notification) {
+        try {
+          await createNotification({
+            recipient: application.applicant,
+            type: notification.type,
+            title: notification.title,
+            message: notification.message,
+            link: `/dashboard/applications/${application._id}`,
+            relatedApplication: application._id,
+            relatedJob: application.job,
+          });
+        } catch (notificationError) {
+          console.error(
+            "Application status notification creation failed:",
+            notificationError.message,
+          );
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message:
-        "Application updated successfully.",
+      message: "Application updated successfully.",
       data: application,
     });
   } catch (error) {

@@ -15,6 +15,8 @@ const companyRoutes = require("./routes/companyRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const interviewRoutes = require("./routes/interviewRoutes");
 
 const app = express();
 
@@ -167,6 +169,16 @@ app.use(
 app.use("/api/profile", profileRoutes);
 
 app.use("/api/admin", adminRoutes);
+
+app.use(
+  "/api/notifications",
+  notificationRoutes
+);
+
+app.use(
+  "/api/interviews",
+  interviewRoutes
+);
 
 // ============================================
 // 404 - ROUTE NOT FOUND
