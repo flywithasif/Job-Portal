@@ -302,7 +302,7 @@ export default function JobDetails() {
       setApplying(true);
 
       await createApplication({
-        job: jobId,
+        jobId,
         resumeUrl: resumeUrl.trim(),
         coverLetter: coverLetter.trim(),
       });

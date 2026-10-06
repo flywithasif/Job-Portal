@@ -1,29 +1,43 @@
 import api from "./api";
 
-// Apply for a job
+// ============================================
+// APPLY FOR A JOB
+// ============================================
+
 export const createApplication = async (applicationData) => {
   const response = await api.post("/applications", applicationData);
 
   return response.data;
 };
 
-// Get logged-in job seeker's applications
+// ============================================
+// GET MY APPLICATIONS
+// ============================================
+
 export const getMyApplications = async () => {
   const response = await api.get("/applications/my");
 
   return response.data;
 };
 
-// Get applications for recruiter's jobs
-export const getJobApplications = async (params = {}) => {
-  const response = await api.get("/applications/jobs", {
+// ============================================
+// GET APPLICATIONS FOR A SPECIFIC JOB
+// Recruiter / Admin
+// ============================================
+
+export const getJobApplications = async (jobId, params = {}) => {
+  const response = await api.get(`/applications/job/${jobId}`, {
     params,
   });
 
   return response.data;
 };
 
-// Update application status
+// ============================================
+// UPDATE APPLICATION STATUS
+// Recruiter / Admin
+// ============================================
+
 export const updateApplicationStatus = async (
   applicationId,
   status,

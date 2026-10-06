@@ -43,12 +43,12 @@ const extractToken = (response) => {
 // AUTH PROVIDER
 // ============================================
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // ==========================================
-  // RESTORE AUTHENTICATION
+  // RESTORE LOGIN SESSION
   // ==========================================
 
   useEffect(() => {
@@ -56,11 +56,6 @@ export const AuthProvider = ({ children }) => {
 
     const restoreSession = async () => {
       const token = localStorage.getItem(TOKEN_KEY);
-      const savedUser = localStorage.getItem(USER_KEY);
-
-      // ----------------------------------------
-      // NO TOKEN = NOT LOGGED IN
-      // ----------------------------------------
 
       if (!token) {
         if (mounted) {
@@ -71,9 +66,8 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // ----------------------------------------
-      // RESTORE SAVED USER IMMEDIATELY
-      // ----------------------------------------
+      // Restore cached user immediately
+      const savedUser = localStorage.getItem(USER_KEY);
 
       if (savedUser) {
         try {
@@ -84,7 +78,7 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (error) {
           console.error(
-            "Saved user data is invalid:",
+            "Invalid saved user data:",
             error,
           );
 
@@ -92,18 +86,11 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // ----------------------------------------
-      // VERIFY SESSION WITH BACKEND
-      // ----------------------------------------
-
+      // Verify token with backend
       try {
         const response = await getCurrentUser();
 
         const currentUser = extractUser(response);
-
-        if (!mounted) {
-          return;
-        }
 
         if (!currentUser) {
           throw new Error(
@@ -111,26 +98,25 @@ export const AuthProvider = ({ children }) => {
           );
         }
 
-        setUser(currentUser);
+        if (mounted) {
+          setUser(currentUser);
 
-        localStorage.setItem(
-          USER_KEY,
-          JSON.stringify(currentUser),
-        );
+          localStorage.setItem(
+            USER_KEY,
+            JSON.stringify(currentUser),
+          );
+        }
       } catch (error) {
         console.error(
           "Session restore failed:",
           error,
         );
 
-        if (!mounted) {
-          return;
+        if (mounted) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
         }
-
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-
-        setUser(null);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -167,10 +153,6 @@ export const AuthProvider = ({ children }) => {
       );
     }
 
-    // ----------------------------------------
-    // SAVE AUTH DATA
-    // ----------------------------------------
-
     localStorage.setItem(
       TOKEN_KEY,
       token,
@@ -183,12 +165,6 @@ export const AuthProvider = ({ children }) => {
 
     setUser(loggedInUser);
 
-    // ----------------------------------------
-    // IMPORTANT:
-    // Return USER, not complete response.
-    // Login.jsx can directly use user.role.
-    // ----------------------------------------
-
     return loggedInUser;
   };
 
@@ -197,9 +173,13 @@ export const AuthProvider = ({ children }) => {
   // ==========================================
 
   const register = async (userData) => {
-    const response = await registerUser(userData);
+    const response = await registerUser(
+      userData,
+    );
 
-    const registeredUser = extractUser(response);
+    const registeredUser =
+      extractUser(response);
+
     const token = extractToken(response);
 
     if (!registeredUser) {
@@ -213,10 +193,6 @@ export const AuthProvider = ({ children }) => {
         "Registration response is missing token.",
       );
     }
-
-    // ----------------------------------------
-    // SAVE AUTH DATA
-    // ----------------------------------------
 
     localStorage.setItem(
       TOKEN_KEY,
@@ -269,13 +245,13 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 // ============================================
-// CUSTOM HOOK
+// USE AUTH HOOK
 // ============================================
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
@@ -285,4 +261,4 @@ export const useAuth = () => {
   }
 
   return context;
-};
+}

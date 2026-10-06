@@ -14,13 +14,9 @@ import {
   updateApplicationStatus,
 } from "../../services/applicationService";
 
-import {
-  getMyJobs,
-} from "../../services/jobService";
+import { getMyJobs } from "../../services/jobService";
 
-import {
-  createInterview,
-} from "../../services/interviewService";
+import { createInterview } from "../../services/interviewService";
 
 const STATUS_OPTIONS = [
   "PENDING",
@@ -42,11 +38,9 @@ function formatEnum(value) {
   if (!value) return "—";
 
   return String(value)
-    .replaceAll("_", " ")
+    .replace(/_/g, " ")
     .toLowerCase()
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase(),
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value) {
@@ -54,7 +48,9 @@ function formatDate(value) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
 
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
@@ -79,38 +75,80 @@ function getApplicantEmail(application) {
   );
 }
 
+function getApplicantId(application) {
+  const applicant =
+    application?.applicant ||
+    application?.user ||
+    null;
+
+  if (typeof applicant === "string") {
+    return applicant;
+  }
+
+  return applicant?._id || applicant?.id || "";
+}
+
 function getApplicantSkills(application) {
   const skills =
     application?.applicant?.skills ||
     application?.user?.skills ||
     [];
 
-  return Array.isArray(skills)
-    ? skills
-    : [];
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+
+  return skills
+    .map((skill) => {
+      if (typeof skill === "string") {
+        return skill;
+      }
+
+      if (typeof skill === "object") {
+        return skill?.name || skill?.title || "";
+      }
+
+      return String(skill || "");
+    })
+    .filter(Boolean);
 }
 
 function getJobTitle(application) {
   return (
     application?.job?.title ||
+    application?.jobTitle ||
     "Job not available"
   );
 }
 
 function getJobId(application) {
+  const job = application?.job;
+
+  if (typeof job === "string") {
+    return job;
+  }
+
   return (
-    application?.job?._id ||
-    application?.job?.id ||
-    application?.job
+    job?._id ||
+    job?.id ||
+    application?.jobId ||
+    ""
   );
 }
 
-function normalizeApplication(application) {
+function normalizeApplication(application = {}) {
   return {
     ...application,
+
     id:
       application?._id ||
       application?.id,
+
+    // Preserve applicant data for interview scheduling.
+    applicant:
+      application?.applicant ||
+      application?.user ||
+      null,
 
     name: getApplicantName(application),
 
@@ -125,21 +163,26 @@ function normalizeApplication(application) {
     resumeUrl:
       application?.resumeUrl ||
       application?.applicant?.resumeUrl ||
+      application?.user?.resumeUrl ||
       "",
 
     coverLetter:
-      application?.coverLetter || "",
+      application?.coverLetter ||
+      "",
 
     phone:
       application?.applicant?.phone ||
+      application?.user?.phone ||
       "",
 
     headline:
       application?.applicant?.headline ||
+      application?.user?.headline ||
       "",
 
     location:
       application?.applicant?.location ||
+      application?.user?.location ||
       "",
 
     status:
@@ -174,21 +217,14 @@ function getInitials(name = "") {
 
 export default function Applicants() {
   const [jobs, setJobs] = useState([]);
-  const [applications, setApplications] =
-    useState([]);
+  const [applications, setApplications] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] =
-    useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
 
-  const [searchQuery, setSearchQuery] =
-    useState("");
-
-  const [statusFilter, setStatusFilter] =
-    useState("All");
-
-  const [jobFilter, setJobFilter] =
-    useState("All jobs");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [jobFilter, setJobFilter] = useState("All jobs");
 
   const [selectedApplicant, setSelectedApplicant] =
     useState(null);
@@ -199,16 +235,15 @@ export default function Applicants() {
   const [interviewSaving, setInterviewSaving] =
     useState(false);
 
-  const [interviewForm, setInterviewForm] =
-    useState({
-      date: "",
-      time: "",
-      duration: "30",
-      type: "VIDEO",
-      meetingLink: "",
-      location: "",
-      notes: "",
-    });
+  const [interviewForm, setInterviewForm] = useState({
+    date: "",
+    time: "",
+    duration: "30",
+    type: "VIDEO",
+    meetingLink: "",
+    location: "",
+    notes: "",
+  });
 
   async function loadData() {
     try {
@@ -227,40 +262,38 @@ export default function Applicants() {
 
       setJobs(recruiterJobs);
 
-      const applicationResults =
-        await Promise.all(
-          recruiterJobs.map(async (job) => {
-            const jobId =
-              job?._id || job?.id;
+      const applicationResults = await Promise.all(
+        recruiterJobs.map(async (job) => {
+          const jobId = job?._id || job?.id;
 
-            if (!jobId) return [];
+          if (!jobId) {
+            return [];
+          }
 
-            try {
-              const response =
-                await getJobApplications(
-                  jobId,
-                  {
-                    page: 1,
-                    limit: 100,
-                  },
-                );
+          try {
+            const response = await getJobApplications(
+              jobId,
+              {
+                page: 1,
+                limit: 100,
+              },
+            );
 
-              return Array.isArray(
-                response?.data,
-              )
-                ? response.data
-                : [];
-            } catch {
-              return [];
-            }
-          }),
-        );
+            return Array.isArray(response?.data)
+              ? response.data
+              : [];
+          } catch {
+            return [];
+          }
+        }),
+      );
 
-      setApplications(
+      const normalizedApplications =
         applicationResults
           .flat()
-          .map(normalizeApplication),
-      );
+          .map(normalizeApplication);
+
+      setApplications(normalizedApplications);
     } catch (error) {
       setApplications([]);
 
@@ -280,44 +313,41 @@ export default function Applicants() {
   }, []);
 
   const filteredApplications = useMemo(() => {
-    const query =
-      searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
 
-    return applications.filter(
-      (application) => {
-        const matchesStatus =
-          statusFilter === "All" ||
-          application.status === statusFilter;
+    return applications.filter((application) => {
+      const matchesStatus =
+        statusFilter === "All" ||
+        application.status === statusFilter;
 
-        const matchesJob =
-          jobFilter === "All jobs" ||
-          String(application.jobId) ===
-            String(jobFilter);
+      const matchesJob =
+        jobFilter === "All jobs" ||
+        String(application.jobId) ===
+          String(jobFilter);
 
-        const searchableValues = [
-          application.name,
-          application.email,
-          application.job,
-          application.headline,
-          application.location,
-          ...application.skills,
-        ];
+      const searchableValues = [
+        application.name,
+        application.email,
+        application.job,
+        application.headline,
+        application.location,
+        ...application.skills,
+      ];
 
-        const matchesSearch =
-          !query ||
-          searchableValues.some((value) =>
-            String(value || "")
-              .toLowerCase()
-              .includes(query),
-          );
-
-        return (
-          matchesStatus &&
-          matchesJob &&
-          matchesSearch
+      const matchesSearch =
+        !query ||
+        searchableValues.some((value) =>
+          String(value || "")
+            .toLowerCase()
+            .includes(query),
         );
-      },
-    );
+
+      return (
+        matchesStatus &&
+        matchesJob &&
+        matchesSearch
+      );
+    });
   }, [
     applications,
     statusFilter,
@@ -362,7 +392,7 @@ export default function Applicants() {
 
       const updated =
         normalizeApplication(
-          response?.data,
+          response?.data || {},
         );
 
       setApplications((current) =>
@@ -371,6 +401,21 @@ export default function Applicants() {
             ? {
                 ...item,
                 ...updated,
+
+                // Do not lose applicant information
+                // if backend status response is not populated.
+                applicant:
+                  updated.applicant ||
+                  item.applicant ||
+                  null,
+
+                jobId:
+                  updated.jobId ||
+                  item.jobId,
+
+                job:
+                  updated.job ||
+                  item.job,
               }
             : item,
         ),
@@ -381,6 +426,19 @@ export default function Applicants() {
           ? {
               ...current,
               ...updated,
+
+              applicant:
+                updated.applicant ||
+                current.applicant ||
+                null,
+
+              jobId:
+                updated.jobId ||
+                current.jobId,
+
+              job:
+                updated.job ||
+                current.job,
             }
           : current,
       );
@@ -409,6 +467,23 @@ export default function Applicants() {
       toast.error(
         "Move the candidate to Reviewing or Shortlisted before scheduling an interview.",
       );
+
+      return;
+    }
+
+    if (!getApplicantId(application)) {
+      toast.error(
+        "Applicant information is missing. Please refresh the applicants list.",
+      );
+
+      return;
+    }
+
+    if (!application.jobId) {
+      toast.error(
+        "Job information is missing. Please refresh the applicants list.",
+      );
+
       return;
     }
 
@@ -425,12 +500,12 @@ export default function Applicants() {
     });
   }
 
-  async function handleScheduleInterview(
-    event,
-  ) {
+  async function handleScheduleInterview(event) {
     event.preventDefault();
 
-    if (!interviewApplicant) return;
+    if (!interviewApplicant) {
+      return;
+    }
 
     if (
       !interviewForm.date ||
@@ -439,6 +514,7 @@ export default function Applicants() {
       toast.error(
         "Please select interview date and time.",
       );
+
       return;
     }
 
@@ -449,6 +525,7 @@ export default function Applicants() {
       toast.error(
         "Meeting link is required for a video interview.",
       );
+
       return;
     }
 
@@ -459,6 +536,7 @@ export default function Applicants() {
       toast.error(
         "Location is required for an in-person interview.",
       );
+
       return;
     }
 
@@ -473,6 +551,26 @@ export default function Applicants() {
       toast.error(
         "Interview must be scheduled for a future date and time.",
       );
+
+      return;
+    }
+
+    const applicantId =
+      getApplicantId(interviewApplicant);
+
+    if (!applicantId) {
+      toast.error(
+        "Applicant information is missing. Please refresh the applicants list and try again.",
+      );
+
+      return;
+    }
+
+    if (!interviewApplicant.jobId) {
+      toast.error(
+        "Job information is missing. Please refresh the applicants list and try again.",
+      );
+
       return;
     }
 
@@ -483,28 +581,33 @@ export default function Applicants() {
         application:
           interviewApplicant.id,
 
-        job: interviewApplicant.jobId,
+        job:
+          interviewApplicant.jobId,
 
         applicant:
-          interviewApplicant.applicant?._id ||
-          interviewApplicant.applicant?.id,
+          applicantId,
 
-        title: `Interview - ${interviewApplicant.job}`,
+        title:
+          `Interview - ${interviewApplicant.job}`,
 
         scheduledAt:
           scheduledAt.toISOString(),
 
-        duration: Number(
-          interviewForm.duration,
-        ),
+        duration:
+          Number(interviewForm.duration),
 
-        type: interviewForm.type,
+        type:
+          interviewForm.type,
 
         meetingLink:
-          interviewForm.meetingLink.trim(),
+          interviewForm.type === "VIDEO"
+            ? interviewForm.meetingLink.trim()
+            : "",
 
         location:
-          interviewForm.location.trim(),
+          interviewForm.type === "IN_PERSON"
+            ? interviewForm.location.trim()
+            : "",
 
         interviewerName: "",
 
@@ -516,6 +619,30 @@ export default function Applicants() {
 
       toast.success(
         "Interview scheduled successfully.",
+      );
+
+      // Backend moves REVIEWING to SHORTLISTED
+      // when an interview is scheduled.
+      setApplications((current) =>
+        current.map((item) =>
+          item.id === interviewApplicant.id &&
+          item.status === "REVIEWING"
+            ? {
+                ...item,
+                status: "SHORTLISTED",
+              }
+            : item,
+        ),
+      );
+
+      setSelectedApplicant((current) =>
+        current?.id === interviewApplicant.id &&
+        current.status === "REVIEWING"
+          ? {
+              ...current,
+              status: "SHORTLISTED",
+            }
+          : current,
       );
 
       setInterviewApplicant(null);
@@ -530,6 +657,41 @@ export default function Applicants() {
       setInterviewSaving(false);
     }
   }
+
+  function handleStatCardClick(filter) {
+    setStatusFilter(filter);
+  }
+
+  const statCards = [
+    {
+      label: "Total applicants",
+      value: stats.total,
+      icon: Users,
+      color: "bg-blue-50 text-blue-700",
+      filter: "All",
+    },
+    {
+      label: "Under review",
+      value: stats.reviewing,
+      icon: Search,
+      color: "bg-amber-50 text-amber-700",
+      filter: "REVIEWING",
+    },
+    {
+      label: "Shortlisted",
+      value: stats.shortlisted,
+      icon: Check,
+      color: "bg-violet-50 text-violet-700",
+      filter: "SHORTLISTED",
+    },
+    {
+      label: "Hired",
+      value: stats.hired,
+      icon: Check,
+      color: "bg-emerald-50 text-emerald-700",
+      filter: "ACCEPTED",
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-7 sm:px-6 lg:px-8">
@@ -554,59 +716,52 @@ export default function Applicants() {
 
         {/* Stats */}
         <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            [
-              "Total applicants",
-              stats.total,
-              Users,
-              "bg-blue-50 text-blue-700",
-            ],
-            [
-              "Under review",
-              stats.reviewing,
-              Search,
-              "bg-amber-50 text-amber-700",
-            ],
-            [
-              "Shortlisted",
-              stats.shortlisted,
-              Check,
-              "bg-violet-50 text-violet-700",
-            ],
-            [
-              "Hired",
-              stats.hired,
-              Check,
-              "bg-emerald-50 text-emerald-700",
-            ],
-          ].map(
-            ([
+          {statCards.map(
+            ({
               label,
               value,
-              Icon,
+              icon: Icon,
               color,
-            ]) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-500">
-                    {label}
+              filter,
+            }) => {
+              const isActive =
+                statusFilter === filter;
+
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() =>
+                    handleStatCardClick(filter)
+                  }
+                  className={`group w-full rounded-2xl border p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100 sm:p-5 ${
+                    isActive
+                      ? "border-blue-300 bg-blue-50/40 ring-2 ring-blue-100"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      {label}
+                    </p>
+
+                    <span
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${color}`}
+                    >
+                      <Icon size={18} />
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-3xl font-black text-[#172b4d]">
+                    {value}
                   </p>
 
-                  <span
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${color}`}
-                  >
-                    <Icon size={18} />
-                  </span>
-                </div>
-
-                <p className="mt-4 text-3xl font-black text-[#172b4d]">
-                  {value}
-                </p>
-              </div>
-            ),
+                  <p className="mt-1 text-xs font-medium text-slate-400 transition-colors group-hover:text-blue-600">
+                    Click to filter
+                  </p>
+                </button>
+              );
+            },
           )}
         </section>
 
@@ -627,7 +782,7 @@ export default function Applicants() {
                   )
                 }
                 placeholder="Search candidate, email, job or skill..."
-                className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
               />
             </div>
 
@@ -638,7 +793,7 @@ export default function Applicants() {
                   event.target.value,
                 )
               }
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-blue-400"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             >
               <option value="All">
                 All statuses
@@ -661,7 +816,7 @@ export default function Applicants() {
                   event.target.value,
                 )
               }
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-blue-400"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
             >
               <option value="All jobs">
                 All jobs
@@ -677,6 +832,52 @@ export default function Applicants() {
               ))}
             </select>
           </div>
+
+          {(statusFilter !== "All" ||
+            jobFilter !== "All jobs" ||
+            searchQuery) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">
+                Active filters:
+              </span>
+
+              {statusFilter !== "All" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStatusFilter("All")
+                  }
+                  className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
+                >
+                  {formatEnum(statusFilter)} ×
+                </button>
+              )}
+
+              {jobFilter !== "All jobs" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setJobFilter("All jobs")
+                  }
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+                >
+                  Job filter ×
+                </button>
+              )}
+
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSearchQuery("")
+                  }
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+                >
+                  Search ×
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Applicants Table */}
@@ -687,10 +888,10 @@ export default function Applicants() {
                 size={20}
                 className="animate-spin"
               />
+
               Loading applicants...
             </div>
-          ) : filteredApplications.length ===
-            0 ? (
+          ) : filteredApplications.length === 0 ? (
             <div className="p-12 text-center">
               <Users
                 size={35}
@@ -705,6 +906,22 @@ export default function Applicants() {
                 Applications will appear here when
                 candidates apply to your jobs.
               </p>
+
+              {(statusFilter !== "All" ||
+                jobFilter !== "All jobs" ||
+                searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("All");
+                    setJobFilter("All jobs");
+                    setSearchQuery("");
+                  }}
+                  className="mt-5 rounded-xl bg-[#0066b3] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#005596]"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -742,7 +959,7 @@ export default function Applicants() {
                     (application) => (
                       <tr
                         key={application.id}
-                        className="hover:bg-slate-50/70"
+                        className="transition hover:bg-slate-50/70"
                       >
                         <td className="px-5 py-5">
                           <button
@@ -788,14 +1005,28 @@ export default function Applicants() {
                           <div className="flex max-w-64 flex-wrap gap-1.5">
                             {application.skills
                               .slice(0, 5)
-                              .map((skill) => (
-                                <span
-                                  key={skill}
-                                  className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
+                              .map(
+                                (
+                                  skill,
+                                  index,
+                                ) => (
+                                  <span
+                                    key={`${skill}-${index}`}
+                                    className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                                  >
+                                    {skill}
+                                  </span>
+                                ),
+                              )}
+
+                            {application.skills.length >
+                              5 && (
+                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">
+                                +
+                                {application.skills.length -
+                                  5}
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -836,7 +1067,7 @@ export default function Applicants() {
                                   event.target.value,
                                 )
                               }
-                              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold outline-none focus:border-blue-400 disabled:opacity-50"
+                              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold outline-none transition focus:border-blue-400 disabled:opacity-50"
                             >
                               {STATUS_OPTIONS.map(
                                 (status) => (
@@ -860,7 +1091,7 @@ export default function Applicants() {
                                 )
                               }
                               title="Schedule interview"
-                              className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                              className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                             >
                               <CalendarDays
                                 size={16}
@@ -898,7 +1129,7 @@ export default function Applicants() {
                 onClick={() =>
                   setSelectedApplicant(null)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-slate-100"
+                className="flex h-9 w-9 items-center justify-center rounded-xl transition hover:bg-slate-100"
               >
                 <X size={18} />
               </button>
@@ -929,6 +1160,27 @@ export default function Applicants() {
                 </div>
               </div>
 
+              <div className="flex flex-wrap gap-2">
+                <span
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    STATUS_STYLES[
+                      selectedApplicant.status
+                    ] ||
+                    STATUS_STYLES.PENDING
+                  }`}
+                >
+                  {formatEnum(
+                    selectedApplicant.status,
+                  )}
+                </span>
+
+                {selectedApplicant.location && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                    {selectedApplicant.location}
+                  </span>
+                )}
+              </div>
+
               {selectedApplicant.headline && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -950,9 +1202,9 @@ export default function Applicants() {
                   {selectedApplicant.skills.length >
                   0 ? (
                     selectedApplicant.skills.map(
-                      (skill) => (
+                      (skill, index) => (
                         <span
-                          key={skill}
+                          key={`${skill}-${index}`}
                           className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600"
                         >
                           {skill}
@@ -987,7 +1239,7 @@ export default function Applicants() {
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-xl bg-[#0066b3] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#005596]"
+                    className="rounded-xl bg-[#0066b3] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#005596]"
                   >
                     View Resume
                   </a>
@@ -1001,7 +1253,7 @@ export default function Applicants() {
                       selectedApplicant,
                     );
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                  className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
                 >
                   <CalendarDays size={16} />
                   Schedule Interview
@@ -1033,14 +1285,16 @@ export default function Applicants() {
                 onClick={() =>
                   setInterviewApplicant(null)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-slate-100"
+                className="flex h-9 w-9 items-center justify-center rounded-xl transition hover:bg-slate-100"
               >
                 <X size={18} />
               </button>
             </div>
 
             <form
-              onSubmit={handleScheduleInterview}
+              onSubmit={
+                handleScheduleInterview
+              }
               className="space-y-5 p-5 sm:p-6"
             >
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1052,11 +1306,9 @@ export default function Applicants() {
                   <input
                     type="date"
                     value={interviewForm.date}
-                    min={
-                      new Date()
-                        .toISOString()
-                        .slice(0, 10)
-                    }
+                    min={new Date()
+                      .toISOString()
+                      .slice(0, 10)}
                     onChange={(event) =>
                       setInterviewForm(
                         (current) => ({
@@ -1066,7 +1318,7 @@ export default function Applicants() {
                         }),
                       )
                     }
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   />
                 </label>
 
@@ -1087,7 +1339,7 @@ export default function Applicants() {
                         }),
                       )
                     }
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   />
                 </label>
 
@@ -1109,20 +1361,24 @@ export default function Applicants() {
                         }),
                       )
                     }
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   >
                     <option value="15">
                       15 minutes
                     </option>
+
                     <option value="30">
                       30 minutes
                     </option>
+
                     <option value="45">
                       45 minutes
                     </option>
+
                     <option value="60">
                       60 minutes
                     </option>
+
                     <option value="90">
                       90 minutes
                     </option>
@@ -1145,14 +1401,16 @@ export default function Applicants() {
                         }),
                       )
                     }
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   >
                     <option value="VIDEO">
                       Video
                     </option>
+
                     <option value="PHONE">
                       Phone
                     </option>
+
                     <option value="IN_PERSON">
                       In person
                     </option>
@@ -1181,7 +1439,7 @@ export default function Applicants() {
                         )
                       }
                       placeholder="https://meet.google.com/..."
-                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                     />
                   </label>
                 )}
@@ -1208,7 +1466,7 @@ export default function Applicants() {
                         )
                       }
                       placeholder="Office address"
-                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                     />
                   </label>
                 )}
@@ -1231,7 +1489,7 @@ export default function Applicants() {
                       )
                     }
                     placeholder="Interview instructions or notes..."
-                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-400"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   />
                 </label>
               </div>
@@ -1242,7 +1500,7 @@ export default function Applicants() {
                   onClick={() =>
                     setInterviewApplicant(null)
                   }
-                  className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600"
+                  className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -1250,8 +1508,15 @@ export default function Applicants() {
                 <button
                   type="submit"
                   disabled={interviewSaving}
-                  className="h-11 rounded-xl bg-[#0066b3] px-5 text-sm font-bold text-white disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0066b3] px-5 text-sm font-bold text-white transition hover:bg-[#005596] disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  {interviewSaving && (
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                  )}
+
                   {interviewSaving
                     ? "Scheduling..."
                     : "Schedule Interview"}
