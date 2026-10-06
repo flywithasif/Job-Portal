@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -13,6 +14,35 @@ import {
 
 const AuthContext = createContext(null);
 
+const TOKEN_KEY = "job_portal_token";
+const USER_KEY = "job_portal_user";
+
+// ============================================
+// RESPONSE HELPERS
+// ============================================
+
+const extractUser = (response) => {
+  return (
+    response?.data?.data?.user ||
+    response?.data?.user ||
+    response?.user ||
+    null
+  );
+};
+
+const extractToken = (response) => {
+  return (
+    response?.data?.data?.token ||
+    response?.data?.token ||
+    response?.token ||
+    null
+  );
+};
+
+// ============================================
+// AUTH PROVIDER
+// ============================================
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,46 +52,97 @@ export const AuthProvider = ({ children }) => {
   // ==========================================
 
   useEffect(() => {
+    let mounted = true;
+
     const restoreSession = async () => {
-      const token = localStorage.getItem(
-        "job_portal_token"
-      );
+      const token = localStorage.getItem(TOKEN_KEY);
+      const savedUser = localStorage.getItem(USER_KEY);
+
+      // ----------------------------------------
+      // NO TOKEN = NOT LOGGED IN
+      // ----------------------------------------
 
       if (!token) {
-        setLoading(false);
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
+
         return;
       }
+
+      // ----------------------------------------
+      // RESTORE SAVED USER IMMEDIATELY
+      // ----------------------------------------
+
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+
+          if (mounted && parsedUser) {
+            setUser(parsedUser);
+          }
+        } catch (error) {
+          console.error(
+            "Saved user data is invalid:",
+            error,
+          );
+
+          localStorage.removeItem(USER_KEY);
+        }
+      }
+
+      // ----------------------------------------
+      // VERIFY SESSION WITH BACKEND
+      // ----------------------------------------
 
       try {
         const response = await getCurrentUser();
 
-        setUser(response.data.user);
+        const currentUser = extractUser(response);
+
+        if (!mounted) {
+          return;
+        }
+
+        if (!currentUser) {
+          throw new Error(
+            "Unable to restore authenticated user.",
+          );
+        }
+
+        setUser(currentUser);
 
         localStorage.setItem(
-          "job_portal_user",
-          JSON.stringify(response.data.user)
+          USER_KEY,
+          JSON.stringify(currentUser),
         );
       } catch (error) {
         console.error(
           "Session restore failed:",
-          error
+          error,
         );
 
-        localStorage.removeItem(
-          "job_portal_token"
-        );
+        if (!mounted) {
+          return;
+        }
 
-        localStorage.removeItem(
-          "job_portal_user"
-        );
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
 
         setUser(null);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     restoreSession();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // ==========================================
@@ -71,24 +152,44 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     const response = await loginUser(credentials);
 
-    const loggedInUser =
-      response.data.user;
+    const loggedInUser = extractUser(response);
+    const token = extractToken(response);
 
-    const token = response.data.token;
+    if (!loggedInUser) {
+      throw new Error(
+        "Login response is missing user.",
+      );
+    }
+
+    if (!token) {
+      throw new Error(
+        "Login response is missing token.",
+      );
+    }
+
+    // ----------------------------------------
+    // SAVE AUTH DATA
+    // ----------------------------------------
 
     localStorage.setItem(
-      "job_portal_token",
-      token
+      TOKEN_KEY,
+      token,
     );
 
     localStorage.setItem(
-      "job_portal_user",
-      JSON.stringify(loggedInUser)
+      USER_KEY,
+      JSON.stringify(loggedInUser),
     );
 
     setUser(loggedInUser);
 
-    return response;
+    // ----------------------------------------
+    // IMPORTANT:
+    // Return USER, not complete response.
+    // Login.jsx can directly use user.role.
+    // ----------------------------------------
+
+    return loggedInUser;
   };
 
   // ==========================================
@@ -96,27 +197,40 @@ export const AuthProvider = ({ children }) => {
   // ==========================================
 
   const register = async (userData) => {
-    const response =
-      await registerUser(userData);
+    const response = await registerUser(userData);
 
-    const registeredUser =
-      response.data.user;
+    const registeredUser = extractUser(response);
+    const token = extractToken(response);
 
-    const token = response.data.token;
+    if (!registeredUser) {
+      throw new Error(
+        "Registration response is missing user.",
+      );
+    }
+
+    if (!token) {
+      throw new Error(
+        "Registration response is missing token.",
+      );
+    }
+
+    // ----------------------------------------
+    // SAVE AUTH DATA
+    // ----------------------------------------
 
     localStorage.setItem(
-      "job_portal_token",
-      token
+      TOKEN_KEY,
+      token,
     );
 
     localStorage.setItem(
-      "job_portal_user",
-      JSON.stringify(registeredUser)
+      USER_KEY,
+      JSON.stringify(registeredUser),
     );
 
     setUser(registeredUser);
 
-    return response;
+    return registeredUser;
   };
 
   // ==========================================
@@ -124,13 +238,8 @@ export const AuthProvider = ({ children }) => {
   // ==========================================
 
   const logout = () => {
-    localStorage.removeItem(
-      "job_portal_token"
-    );
-
-    localStorage.removeItem(
-      "job_portal_user"
-    );
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
 
     setUser(null);
   };
@@ -139,14 +248,21 @@ export const AuthProvider = ({ children }) => {
   // CONTEXT VALUE
   // ==========================================
 
-  const value = {
-    user,
-    loading,
-    isAuthenticated: Boolean(user),
-    login,
-    register,
-    logout,
-  };
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isAuthenticated: Boolean(user),
+      login,
+      register,
+      logout,
+    }),
+    [user, loading],
+  );
+
+  // ==========================================
+  // PROVIDER
+  // ==========================================
 
   return (
     <AuthContext.Provider value={value}>
@@ -164,7 +280,7 @@ export const useAuth = () => {
 
   if (!context) {
     throw new Error(
-      "useAuth must be used inside AuthProvider."
+      "useAuth must be used inside AuthProvider.",
     );
   }
 

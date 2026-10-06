@@ -1,347 +1,945 @@
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
+
+
+
+import Navbar from "./components/Navbar";
 
 import Footer from "./components/Footer";
-import Navbar from "./components/Navbar";
+
+import DashboardLayout from "./components/DashboardLayout";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Public pages
-import CompanyDetails from "./pages/CompanyDetails";
+
+
 import Home from "./pages/Home";
-import JobDetails from "./pages/JobDetails";
+
 import Jobs from "./pages/Jobs";
+
+import JobDetails from "./pages/JobDetails";
+
 import Login from "./pages/Login";
+
 import Register from "./pages/Register";
 
-// Password recovery pages
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyOTP from "./pages/VerifyOTP";
+import CompanyDetails from "./pages/CompanyDetails";
 
-// Job seeker pages
-import ApplicationDetails from "./pages/seeker/ApplicationDetails";
-import AppliedJobs from "./pages/seeker/AppliedJobs";
-import Interviews from "./pages/seeker/Interviews";
-import Notifications from "./pages/seeker/Notifications";
-import Profile from "./pages/seeker/Profile";
-import SavedJobs from "./pages/seeker/SavedJobs";
+
+
 import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 
-// Recruiter pages
-import Applicants from "./pages/recruiter/Applicants";
-import CompanyProfile from "./pages/recruiter/CompanyProfile";
-import ManageJobs from "./pages/recruiter/ManageJobs";
 import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 
-// Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminJobs from "./pages/admin/Jobs";
-import Companies from "./pages/admin/Companies";
-import Moderation from "./pages/admin/Moderation";
-import Users from "./pages/admin/Users";
 
-/*
- * Public layout
- *
- * Used for public-facing pages that need
- * the main navbar and footer.
- */
-function PublicLayout() {
+import Profile from "./pages/seeker/Profile";
+
+import SavedJobs from "./pages/seeker/SavedJobs";
+
+import AppliedJobs from "./pages/seeker/AppliedJobs";
+
+import ApplicationDetails from "./pages/seeker/ApplicationDetails";
+
+import Notifications from "./pages/seeker/Notifications";
+
+import Interviews from "./pages/seeker/Interviews";
+
+
+
+import ManageJobs from "./pages/recruiter/ManageJobs";
+
+import Applicants from "./pages/recruiter/Applicants";
+
+import CompanyProfile from "./pages/recruiter/CompanyProfile";
+
+
+
+import {
+
+  Bookmark,
+
+  BriefcaseBusiness,
+
+  CalendarDays,
+
+  FileText,
+
+  Search,
+
+} from "lucide-react";
+
+
+
+const seekerNavItems = [
+
+  {
+
+    label: "Dashboard",
+
+    path: "/dashboard",
+
+    icon: BriefcaseBusiness,
+
+  },
+
+  {
+
+    label: "Find Jobs",
+
+    path: "/dashboard/jobs",
+
+    icon: Search,
+
+  },
+
+  {
+
+    label: "Applications",
+
+    path: "/dashboard/applied-jobs",
+
+    icon: FileText,
+
+  },
+
+  {
+
+    label: "Saved Jobs",
+
+    path: "/dashboard/saved-jobs",
+
+    icon: Bookmark,
+
+  },
+
+  {
+
+    label: "Interviews",
+
+    path: "/dashboard/interviews",
+
+    icon: CalendarDays,
+
+  },
+
+];
+
+
+
+function PublicLayout({ children }) {
+
   return (
+
     <>
+
       <Navbar />
-      <Outlet />
+
+      {children}
+
       <Footer />
+
     </>
+
   );
+
 }
 
-/*
- * Dashboard layout
- *
- * Protected pages use the main navbar
- * but do not display the public footer.
- */
-function DashboardLayout() {
+
+
+function SeekerLayout({ title, children }) {
+
   return (
-    <>
-      <Navbar />
-      <Outlet />
-    </>
+
+    <ProtectedRoute roles={["JOB_SEEKER"]}>
+
+      <DashboardLayout
+
+        title={title}
+
+        navItems={seekerNavItems}
+
+      >
+
+        {children}
+
+      </DashboardLayout>
+
+    </ProtectedRoute>
+
   );
+
 }
 
-/*
- * Simple public placeholder page.
- */
-function PlaceholderPage({
-  title,
-  description,
-}) {
+
+
+function LegacyApplicationRedirect() {
+
+  const { id } = useParams();
+
+
+
+  return <Navigate to={`/dashboard/applications/${id}`} replace />;
+
+}
+
+
+
+function PlaceholderPage({ title }) {
+
   return (
-    <PublicLayout>
-      <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-20 text-center">
-        <h1 className="text-3xl font-black text-[#172b4d]">
-          {title}
-        </h1>
 
-        <p className="mt-3 text-slate-500">
-          {description}
-        </p>
-      </main>
-    </PublicLayout>
+    <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-20 text-center sm:px-6 lg:px-8">
+
+      <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#0066b3]">
+
+        CareerFlow
+
+      </p>
+
+
+
+      <h1 className="mt-3 text-3xl font-black text-[#172b4d]">
+
+        {title}
+
+      </h1>
+
+
+
+      <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-500">
+
+        This section is part of the platform and will be connected to
+
+        the backend modules in the next development phase.
+
+      </p>
+
+    </main>
+
   );
+
 }
+
+
 
 export default function App() {
+
   return (
+
     <Routes>
-      {/* =========================================================
-          PUBLIC ROUTES
-          ========================================================= */}
 
-      <Route element={<PublicLayout />}>
-        <Route
-          path="/"
-          element={<Home />}
-        />
-
-        <Route
-          path="/jobs"
-          element={<Jobs />}
-        />
-
-        <Route
-          path="/jobs/:id"
-          element={<JobDetails />}
-        />
-
-        <Route
-          path="/companies"
-          element={
-            <PlaceholderPage
-              title="Explore Companies"
-              description="Company listings will be available here."
-            />
-          }
-        />
-
-        <Route
-          path="/companies/:id"
-          element={<CompanyDetails />}
-        />
-
-        <Route
-          path="/career-advice"
-          element={
-            <PlaceholderPage
-              title="Career Advice"
-              description="Career resources will be available here."
-            />
-          }
-        />
-
-        {/* Authentication */}
-
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-        {/* Password recovery */}
-
-        <Route
-          path="/forgot-password"
-          element={<ForgotPassword />}
-        />
-
-        <Route
-          path="/verify-otp"
-          element={<VerifyOTP />}
-        />
-
-        <Route
-          path="/reset-password"
-          element={<ResetPassword />}
-        />
-      </Route>
-
-      {/* =========================================================
-          JOB SEEKER ROUTES
-          ========================================================= */}
+      {/* Public pages */}
 
       <Route
+
+        path="/"
+
         element={
-          <ProtectedRoute
-            allowedRoles={["JOB_SEEKER"]}
-          />
+
+          <PublicLayout>
+
+            <Home />
+
+          </PublicLayout>
+
         }
-      >
-        <Route element={<DashboardLayout />}>
-          <Route
-            path="/dashboard"
-            element={<SeekerDashboard />}
-          />
 
-          <Route
-            path="/profile"
-            element={<Profile />}
-          />
-
-          <Route
-            path="/saved-jobs"
-            element={<SavedJobs />}
-          />
-
-          <Route
-            path="/applied-jobs"
-            element={<AppliedJobs />}
-          />
-
-          <Route
-            path="/applications/:id"
-            element={<ApplicationDetails />}
-          />
-
-          <Route
-            path="/notifications"
-            element={<Notifications />}
-          />
-
-          <Route
-            path="/interviews"
-            element={<Interviews />}
-          />
-        </Route>
-      </Route>
-
-      {/* =========================================================
-          COMPATIBILITY ROUTES
-          ========================================================= */}
-
-      <Route
-        path="/dashboard/saved"
-        element={
-          <Navigate
-            to="/saved-jobs"
-            replace
-          />
-        }
       />
 
-      <Route
-        path="/dashboard/applications"
-        element={
-          <Navigate
-            to="/applied-jobs"
-            replace
-          />
-        }
-      />
+
 
       <Route
+
+        path="/jobs"
+
+        element={
+
+          <PublicLayout>
+
+            <Jobs />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/jobs/:id"
+
+        element={
+
+          <PublicLayout>
+
+            <JobDetails />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/companies"
+
+        element={
+
+          <PublicLayout>
+
+            <PlaceholderPage title="Explore Companies" />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/career-advice"
+
+        element={
+
+          <PublicLayout>
+
+            <PlaceholderPage title="Career Advice" />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/login"
+
+        element={
+
+          <PublicLayout>
+
+            <Login />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/register"
+
+        element={
+
+          <PublicLayout>
+
+            <Register />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      {/* =========================================================
+
+          JOB SEEKER DASHBOARD
+
+      ========================================================== */}
+
+
+
+      <Route
+
+        path="/dashboard"
+
+        element={
+
+          <SeekerLayout title="Job Seeker Dashboard">
+
+            <SeekerDashboard />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/jobs"
+
+        element={
+
+          <SeekerLayout title="Find Jobs">
+
+            <Jobs />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/jobs/:id"
+
+        element={
+
+          <SeekerLayout title="Job Details">
+
+            <JobDetails />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/profile"
+
+        element={
+
+          <SeekerLayout title="My Profile">
+
+            <Profile />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/saved-jobs"
+
+        element={
+
+          <SeekerLayout title="Saved Jobs">
+
+            <SavedJobs />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/applied-jobs"
+
+        element={
+
+          <SeekerLayout title="My Applications">
+
+            <AppliedJobs />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/applications/:id"
+
+        element={
+
+          <SeekerLayout title="Application Details">
+
+            <ApplicationDetails />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/dashboard/notifications"
+
+        element={
+
+          <SeekerLayout title="Notifications">
+
+            <Notifications />
+
+          </SeekerLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
         path="/dashboard/interviews"
+
         element={
-          <Navigate
-            to="/interviews"
-            replace
-          />
+
+          <SeekerLayout title="Interviews">
+
+            <Interviews />
+
+          </SeekerLayout>
+
         }
+
       />
 
-      {/* =========================================================
-          RECRUITER ROUTES
-          ========================================================= */}
+
+
+      {/* Old seeker URLs -> new dashboard URLs */}
 
       <Route
+
+        path="/profile"
+
+        element={<Navigate to="/dashboard/profile" replace />}
+
+      />
+
+
+
+      <Route
+
+        path="/saved-jobs"
+
+        element={<Navigate to="/dashboard/saved-jobs" replace />}
+
+      />
+
+
+
+      <Route
+
+        path="/applied-jobs"
+
+        element={<Navigate to="/dashboard/applied-jobs" replace />}
+
+      />
+
+
+
+      <Route
+
+        path="/applications/:id"
+
+        element={<LegacyApplicationRedirect />}
+
+      />
+
+
+
+      <Route
+
+        path="/notifications"
+
+        element={<Navigate to="/dashboard/notifications" replace />}
+
+      />
+
+
+
+      <Route
+
+        path="/interviews"
+
+        element={<Navigate to="/dashboard/interviews" replace />}
+
+      />
+
+
+
+      {/* Recruiter */}
+
+      <Route
+
+        path="/recruiter"
+
         element={
-          <ProtectedRoute
-            allowedRoles={["RECRUITER"]}
-          />
+
+          <ProtectedRoute allowedRoles={["RECRUITER"]}>
+
+            <DashboardLayout
+
+              title="Recruiter Dashboard"
+
+              navItems={[
+
+                {
+
+                  label: "Dashboard",
+
+                  path: "/recruiter",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+                {
+
+                  label: "Manage Jobs",
+
+                  path: "/recruiter/jobs",
+
+                  icon: FileText,
+
+                },
+
+                {
+
+                  label: "Applicants",
+
+                  path: "/recruiter/applicants",
+
+                  icon: Search,
+
+                },
+
+                {
+
+                  label: "Company Profile",
+
+                  path: "/recruiter/company-profile",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+              ]}
+
+            >
+
+              <RecruiterDashboard />
+
+            </DashboardLayout>
+
+          </ProtectedRoute>
+
         }
-      >
-        <Route element={<DashboardLayout />}>
-          <Route
-            path="/recruiter"
-            element={<RecruiterDashboard />}
-          />
 
-          <Route
-            path="/recruiter/jobs"
-            element={<ManageJobs />}
-          />
+      />
 
-          <Route
-            path="/recruiter/applicants"
-            element={<Applicants />}
-          />
 
-          <Route
-            path="/recruiter/company-profile"
-            element={<CompanyProfile />}
-          />
-        </Route>
-      </Route>
-
-      {/* =========================================================
-          ADMIN ROUTES
-          ========================================================= */}
 
       <Route
+
+        path="/recruiter/jobs"
+
         element={
-          <ProtectedRoute
-            allowedRoles={[
-              "SUPER_ADMIN",
-              "ADMIN",
-            ]}
-          />
+
+          <ProtectedRoute allowedRoles={["RECRUITER"]}>
+
+            <DashboardLayout
+
+              title="Manage Jobs"
+
+              navItems={[
+
+                {
+
+                  label: "Dashboard",
+
+                  path: "/recruiter",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+                {
+
+                  label: "Manage Jobs",
+
+                  path: "/recruiter/jobs",
+
+                  icon: FileText,
+
+                },
+
+                {
+
+                  label: "Applicants",
+
+                  path: "/recruiter/applicants",
+
+                  icon: Search,
+
+                },
+
+                {
+
+                  label: "Company Profile",
+
+                  path: "/recruiter/company-profile",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+              ]}
+
+            >
+
+              <ManageJobs />
+
+            </DashboardLayout>
+
+          </ProtectedRoute>
+
         }
-      >
-        <Route element={<DashboardLayout />}>
-          <Route
-            path="/admin"
-            element={<AdminDashboard />}
-          />
 
-          <Route
-            path="/admin/users"
-            element={<Users />}
-          />
+      />
 
-          <Route
-            path="/admin/companies"
-            element={<Companies />}
-          />
 
-          <Route
-            path="/admin/jobs"
-            element={<AdminJobs />}
-          />
-
-          <Route
-            path="/admin/moderation"
-            element={<Moderation />}
-          />
-        </Route>
-      </Route>
-
-      {/* =========================================================
-          UNKNOWN ROUTES
-          ========================================================= */}
 
       <Route
+
+        path="/recruiter/applicants"
+
+        element={
+
+          <ProtectedRoute allowedRoles={["RECRUITER"]}>
+
+            <DashboardLayout
+
+              title="Applicants"
+
+              navItems={[
+
+                {
+
+                  label: "Dashboard",
+
+                  path: "/recruiter",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+                {
+
+                  label: "Manage Jobs",
+
+                  path: "/recruiter/jobs",
+
+                  icon: FileText,
+
+                },
+
+                {
+
+                  label: "Applicants",
+
+                  path: "/recruiter/applicants",
+
+                  icon: Search,
+
+                },
+
+                {
+
+                  label: "Company Profile",
+
+                  path: "/recruiter/company-profile",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+              ]}
+
+            >
+
+              <Applicants />
+
+            </DashboardLayout>
+
+          </ProtectedRoute>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/recruiter/company-profile"
+
+        element={
+
+          <ProtectedRoute allowedRoles={["RECRUITER"]}>
+
+            <DashboardLayout
+
+              title="Company Profile"
+
+              navItems={[
+
+                {
+
+                  label: "Dashboard",
+
+                  path: "/recruiter",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+                {
+
+                  label: "Manage Jobs",
+
+                  path: "/recruiter/jobs",
+
+                  icon: FileText,
+
+                },
+
+                {
+
+                  label: "Applicants",
+
+                  path: "/recruiter/applicants",
+
+                  icon: Search,
+
+                },
+
+                {
+
+                  label: "Company Profile",
+
+                  path: "/recruiter/company-profile",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+              ]}
+
+            >
+
+              <CompanyProfile />
+
+            </DashboardLayout>
+
+          </ProtectedRoute>
+
+        }
+
+      />
+
+
+
+      {/* Admin */}
+
+      <Route
+
+        path="/admin"
+
+        element={
+
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
+
+            <DashboardLayout
+
+              title="Admin Dashboard"
+
+              navItems={[
+
+                {
+
+                  label: "Dashboard",
+
+                  path: "/admin",
+
+                  icon: BriefcaseBusiness,
+
+                },
+
+              ]}
+
+            >
+
+              <AdminDashboard />
+
+            </DashboardLayout>
+
+          </ProtectedRoute>
+
+        }
+
+      />
+
+
+
+      <Route
+
+        path="/companies/:id"
+
+        element={
+
+          <PublicLayout>
+
+            <CompanyDetails />
+
+          </PublicLayout>
+
+        }
+
+      />
+
+
+
+      <Route
+
         path="*"
-        element={
-          <Navigate
-            to="/"
-            replace
-          />
-        }
+
+        element={<Navigate to="/" replace />}
+
       />
+
     </Routes>
+
   );
+
 }

@@ -63,6 +63,7 @@ const register = async (req, res, next) => {
     // ==========================================
 
     const normalizedName = name.trim();
+
     const normalizedEmail = email
       .trim()
       .toLowerCase();
@@ -204,7 +205,7 @@ const login = async (req, res, next) => {
     // FIND USER
     // ==========================================
     //
-    // Password is select:false in the User model.
+    // Password is select:false in User model.
     // Explicitly include it only for authentication.
     //
 
@@ -265,10 +266,9 @@ const login = async (req, res, next) => {
         $set: {
           lastLoginAt,
         },
-      }
+      },
     );
 
-    // Keep returned object synchronized.
     user.lastLoginAt = lastLoginAt;
 
     // ==========================================
@@ -300,8 +300,8 @@ const login = async (req, res, next) => {
 //
 // GET /api/auth/me
 //
-// Authentication middleware already verifies
-// the token and attaches the user to req.user.
+// Authentication middleware verifies the token
+// and attaches the user to req.user.
 //
 
 const getMe = async (req, res, next) => {
