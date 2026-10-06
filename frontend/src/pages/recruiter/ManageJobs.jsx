@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -13,6 +14,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -24,6 +26,10 @@ import {
 } from "../../services/jobService";
 
 import { getMyCompany } from "../../services/companyService";
+
+/* =========================================================
+   DEFAULT JOB FORM
+========================================================= */
 
 const emptyJob = {
   title: "",
@@ -39,17 +45,33 @@ const emptyJob = {
   description: "",
 };
 
+/* =========================================================
+   FILTERS
+========================================================= */
+
 const filters = ["All", "Active", "Closed"];
 
+/* =========================================================
+   INPUT STYLES
+========================================================= */
+
 const inputClass =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50";
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#0066b3] focus:ring-4 focus:ring-blue-50";
+
+/* =========================================================
+   DATE FORMATTER
+========================================================= */
 
 function formatDate(value) {
-  if (!value) return "—";
+  if (!value) {
+    return "—";
+  }
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
 
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
@@ -58,16 +80,24 @@ function formatDate(value) {
   });
 }
 
+/* =========================================================
+   ENUM FORMATTER
+========================================================= */
+
 function formatEnum(value) {
-  if (!value) return "—";
+  if (!value) {
+    return "—";
+  }
 
   return String(value)
     .replaceAll("_", " ")
     .toLowerCase()
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase(),
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+
+/* =========================================================
+   SALARY FORMATTER
+========================================================= */
 
 function formatSalary(min, max) {
   if (min == null && max == null) {
@@ -81,18 +111,20 @@ function formatSalary(min, max) {
   }
 
   if (min != null) {
-    return `From ₹${Number(min).toLocaleString(
-      "en-IN",
-    )}`;
+    return `From ₹${Number(min).toLocaleString("en-IN")}`;
   }
 
-  return `Up to ₹${Number(max).toLocaleString(
-    "en-IN",
-  )}`;
+  return `Up to ₹${Number(max).toLocaleString("en-IN")}`;
 }
 
+/* =========================================================
+   COMMA SEPARATED VALUES
+========================================================= */
+
 function parseCommaSeparatedValues(value) {
-  if (!value.trim()) return [];
+  if (!value.trim()) {
+    return [];
+  }
 
   return value
     .split(",")
@@ -100,12 +132,20 @@ function parseCommaSeparatedValues(value) {
     .filter(Boolean);
 }
 
+/* =========================================================
+   NORMALIZE JOB
+========================================================= */
+
 function normalizeJob(job) {
   return {
     ...job,
     id: job?._id || job?.id,
   };
 }
+
+/* =========================================================
+   API ERROR MESSAGE
+========================================================= */
 
 function getApiErrorMessage(error, fallback) {
   const responseData = error?.response?.data;
@@ -119,6 +159,10 @@ function getApiErrorMessage(error, fallback) {
 
   return responseData?.message || fallback;
 }
+
+/* =========================================================
+   STATUS BADGE
+========================================================= */
 
 function StatusBadge({ status }) {
   const active = status === "OPEN";
@@ -142,6 +186,10 @@ function StatusBadge({ status }) {
   );
 }
 
+/* =========================================================
+   STAT CARD
+========================================================= */
+
 function StatCard({
   label,
   value,
@@ -149,7 +197,7 @@ function StatCard({
   color,
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-slate-500">
           {label}
@@ -169,23 +217,22 @@ function StatCard({
   );
 }
 
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
+
 export default function ManageJobs() {
   const [jobs, setJobs] = useState([]);
   const [company, setCompany] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [companyLoading, setCompanyLoading] =
-    useState(true);
+  const [companyLoading, setCompanyLoading] = useState(true);
 
-  const [activeFilter, setActiveFilter] =
-    useState("All");
-
-  const [searchQuery, setSearchQuery] =
-    useState("");
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingJobId, setEditingJobId] =
-    useState(null);
+  const [editingJobId, setEditingJobId] = useState(null);
 
   const [form, setForm] = useState({
     ...emptyJob,
@@ -194,6 +241,10 @@ export default function ManageJobs() {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [actionId, setActionId] = useState(null);
+
+  /* =======================================================
+     LOAD COMPANY
+  ======================================================= */
 
   async function loadCompany() {
     try {
@@ -221,6 +272,10 @@ export default function ManageJobs() {
       setCompanyLoading(false);
     }
   }
+
+  /* =======================================================
+     LOAD RECRUITER JOBS
+  ======================================================= */
 
   async function loadJobs() {
     try {
@@ -250,10 +305,18 @@ export default function ManageJobs() {
     }
   }
 
+  /* =======================================================
+     INITIAL LOAD
+  ======================================================= */
+
   useEffect(() => {
     loadCompany();
     loadJobs();
   }, []);
+
+  /* =======================================================
+     STATS
+  ======================================================= */
 
   const stats = useMemo(
     () => ({
@@ -276,6 +339,10 @@ export default function ManageJobs() {
     [jobs],
   );
 
+  /* =======================================================
+     FILTERED JOBS
+  ======================================================= */
+
   const filteredJobs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -293,6 +360,7 @@ export default function ManageJobs() {
         job.employmentType,
         job.workplaceType,
         job.experienceLevel,
+        job.companyName,
       ];
 
       const matchesSearch =
@@ -307,6 +375,10 @@ export default function ManageJobs() {
     });
   }, [jobs, activeFilter, searchQuery]);
 
+  /* =======================================================
+     OPEN CREATE MODAL
+  ======================================================= */
+
   function openCreateModal() {
     setEditingJobId(null);
     setForm({ ...emptyJob });
@@ -314,37 +386,65 @@ export default function ManageJobs() {
     setModalOpen(true);
   }
 
+  /* =======================================================
+     OPEN EDIT MODAL
+  ======================================================= */
+
   function openEditModal(job) {
     setEditingJobId(job.id);
 
     setForm({
       title: job.title || "",
+
       location: job.location || "",
+
       employmentType:
         job.employmentType || "FULL_TIME",
+
+      /*
+       * IMPORTANT:
+       * Backend uses ONSITE, not ON_SITE.
+       */
       workplaceType:
         job.workplaceType || "HYBRID",
+
+      /*
+       * Backend supported values:
+       * FRESHER
+       * ENTRY_LEVEL
+       * MID_LEVEL
+       * SENIOR
+       */
       experienceLevel:
         job.experienceLevel || "ENTRY_LEVEL",
+
       salaryMin: job.salaryMin ?? "",
       salaryMax: job.salaryMax ?? "",
+
       applicationDeadline: job.applicationDeadline
         ? new Date(job.applicationDeadline)
             .toISOString()
             .slice(0, 10)
         : "",
+
       skills: Array.isArray(job.skills)
         ? job.skills.join(", ")
         : "",
+
       requirements: Array.isArray(job.requirements)
         ? job.requirements.join("\n")
         : "",
+
       description: job.description || "",
     });
 
     setFormError("");
     setModalOpen(true);
   }
+
+  /* =======================================================
+     FORM CHANGE
+  ======================================================= */
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -355,10 +455,18 @@ export default function ManageJobs() {
     }));
   }
 
+  /* =======================================================
+     SUBMIT CREATE / UPDATE
+  ======================================================= */
+
   async function handleSubmit(event) {
     event.preventDefault();
 
     setFormError("");
+
+    /* -----------------------------------------------
+       BASIC VALIDATION
+    ------------------------------------------------ */
 
     if (
       !form.title.trim() ||
@@ -368,6 +476,7 @@ export default function ManageJobs() {
       setFormError(
         "Job title, location and description are required.",
       );
+
       return;
     }
 
@@ -375,15 +484,25 @@ export default function ManageJobs() {
       setFormError(
         "Job description must contain at least 20 characters.",
       );
+
       return;
     }
+
+    /* -----------------------------------------------
+       COMPANY CHECK
+    ------------------------------------------------ */
 
     if (!company?._id) {
       setFormError(
         "Please create your company profile before posting a job.",
       );
+
       return;
     }
+
+    /* -----------------------------------------------
+       SALARY
+    ------------------------------------------------ */
 
     const minSalary =
       form.salaryMin === ""
@@ -409,41 +528,108 @@ export default function ManageJobs() {
       setFormError(
         "Please enter a valid salary range.",
       );
+
       return;
     }
 
-    if (
-      form.applicationDeadline &&
-      new Date(form.applicationDeadline) <
-        new Date()
-    ) {
-      setFormError(
-        "Application deadline cannot be in the past.",
+    /* -----------------------------------------------
+       DEADLINE
+    ------------------------------------------------ */
+
+    if (form.applicationDeadline) {
+      const selectedDate = new Date(
+        `${form.applicationDeadline}T23:59:59`,
       );
-      return;
+
+      if (Number.isNaN(selectedDate.getTime())) {
+        setFormError(
+          "Please select a valid application deadline.",
+        );
+
+        return;
+      }
+
+      if (selectedDate < new Date()) {
+        setFormError(
+          "Application deadline cannot be in the past.",
+        );
+
+        return;
+      }
     }
+
+    /* -----------------------------------------------
+       SKILLS
+    ------------------------------------------------ */
 
     const skills = parseCommaSeparatedValues(
       form.skills,
     );
+
+    if (skills.length > 50) {
+      setFormError(
+        "You can add a maximum of 50 skills.",
+      );
+
+      return;
+    }
+
+    /* -----------------------------------------------
+       REQUIREMENTS
+    ------------------------------------------------ */
 
     const requirements = form.requirements
       .split("\n")
       .map((item) => item.trim())
       .filter(Boolean);
 
+    if (requirements.length > 30) {
+      setFormError(
+        "You can add a maximum of 30 requirements.",
+      );
+
+      return;
+    }
+
+    /* -----------------------------------------------
+       BACKEND PAYLOAD
+    ------------------------------------------------ */
+
     const payload = {
       title: form.title.trim(),
+
+      /*
+       * Backend verifies that this company belongs
+       * to the logged-in recruiter.
+       */
       company: company._id,
+
       location: form.location.trim(),
+
       employmentType: form.employmentType,
+
+      /*
+       * Backend expects:
+       * ONSITE / HYBRID / REMOTE
+       */
       workplaceType: form.workplaceType,
+
+      /*
+       * Backend expects:
+       * FRESHER / ENTRY_LEVEL / MID_LEVEL / SENIOR
+       */
       experienceLevel: form.experienceLevel,
+
       description: form.description.trim(),
+
       requirements,
+
       skills,
+
       salaryMin: minSalary,
+
       salaryMax: maxSalary,
+
       applicationDeadline: form.applicationDeadline
         ? new Date(
             `${form.applicationDeadline}T23:59:59`,
@@ -453,6 +639,10 @@ export default function ManageJobs() {
 
     try {
       setSubmitting(true);
+
+      /* ---------------------------------------------
+         UPDATE EXISTING JOB
+      ---------------------------------------------- */
 
       if (editingJobId) {
         const response = await updateJob(
@@ -476,6 +666,10 @@ export default function ManageJobs() {
           "Job updated successfully.",
         );
       } else {
+        /* -------------------------------------------
+           CREATE NEW JOB
+        -------------------------------------------- */
+
         const response = await createJob(payload);
 
         const createdJob = normalizeJob(
@@ -508,6 +702,10 @@ export default function ManageJobs() {
     }
   }
 
+  /* =======================================================
+     OPEN / CLOSE JOB
+  ======================================================= */
+
   async function toggleJobStatus(job) {
     try {
       setActionId(job.id);
@@ -517,9 +715,12 @@ export default function ManageJobs() {
           ? "CLOSED"
           : "OPEN";
 
-      const response = await updateJob(job.id, {
-        status: nextStatus,
-      });
+      const response = await updateJob(
+        job.id,
+        {
+          status: nextStatus,
+        },
+      );
 
       const updatedJob = normalizeJob(
         response?.data,
@@ -550,12 +751,18 @@ export default function ManageJobs() {
     }
   }
 
+  /* =======================================================
+     DELETE JOB
+  ======================================================= */
+
   async function handleDeleteJob(job) {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${job.title}"?`,
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setActionId(job.id);
@@ -572,6 +779,10 @@ export default function ManageJobs() {
         "Job deleted successfully.",
       );
     } catch (error) {
+      /*
+       * Backend intentionally prevents deleting
+       * jobs that already have applications.
+       */
       toast.error(
         getApiErrorMessage(
           error,
@@ -582,6 +793,10 @@ export default function ManageJobs() {
       setActionId(null);
     }
   }
+
+  /* =======================================================
+     STAT CARDS
+  ======================================================= */
 
   const statCards = [
     {
@@ -594,8 +809,7 @@ export default function ManageJobs() {
       label: "Active jobs",
       value: stats.active,
       icon: CheckCircle2,
-      color:
-        "bg-emerald-50 text-emerald-700",
+      color: "bg-emerald-50 text-emerald-700",
     },
     {
       label: "Closed jobs",
@@ -607,36 +821,43 @@ export default function ManageJobs() {
       label: "Total applicants",
       value: stats.applicants,
       icon: Users,
-      color:
-        "bg-violet-50 text-violet-700",
+      color: "bg-violet-50 text-violet-700",
     },
   ];
 
+  /* =======================================================
+     UI
+  ======================================================= */
+
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-7 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f6f8fb] px-4 py-7 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Link
               to="/recruiter"
-              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-700"
+              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-[#0066b3]"
             >
               <ArrowLeft size={16} />
+
               Back to dashboard
             </Link>
 
-            <p className="text-xs font-bold tracking-[0.18em] text-blue-700">
+            <p className="text-xs font-bold tracking-[0.18em] text-[#0066b3]">
               RECRUITER WORKSPACE
             </p>
 
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#172b4d] sm:text-3xl">
               Manage job postings
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">
-              Create job listings, manage openings
-              and track applicants.
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+              Create job listings, manage openings,
+              and track applicants from one place.
             </p>
           </div>
 
@@ -647,28 +868,39 @@ export default function ManageJobs() {
               companyLoading ||
               !company?._id
             }
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0066b3] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005596] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={18} />
+
             Post a new job
           </button>
         </div>
 
+        {/* =================================================
+            COMPANY WARNING
+        ================================================= */}
+
         {!companyLoading && !company?._id && (
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            <strong>Company profile required.</strong>{" "}
-            Create your company profile before posting
-            jobs.
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <strong>Company profile required.</strong>{" "}
+              Create your company profile before
+              posting jobs.
+            </div>
+
             <Link
               to="/recruiter/company-profile"
-              className="ml-2 font-bold underline"
+              className="font-bold underline"
             >
               Create profile
             </Link>
           </div>
         )}
 
-        {/* Stats */}
+        {/* =================================================
+            STATS
+        ================================================= */}
+
         <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {statCards.map((stat) => (
             <StatCard
@@ -678,9 +910,12 @@ export default function ManageJobs() {
           ))}
         </section>
 
-        {/* Filters */}
+        {/* =================================================
+            FILTER BAR
+        ================================================= */}
+
         <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <button
@@ -691,7 +926,7 @@ export default function ManageJobs() {
                   }
                   className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     activeFilter === filter
-                      ? "bg-[#0066b3] text-white"
+                      ? "bg-[#0066b3] text-white shadow-sm"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -720,27 +955,53 @@ export default function ManageJobs() {
           </div>
         </section>
 
-        {/* Jobs */}
+        {/* =================================================
+            JOB LIST
+        ================================================= */}
+
         <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {loading ? (
-            <div className="flex min-h-64 items-center justify-center text-slate-500">
-              Loading jobs...
+            <div className="flex min-h-64 items-center justify-center">
+              <div className="text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066b3]" />
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Loading your jobs...
+                </p>
+              </div>
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="p-12 text-center">
-              <BriefcaseBusiness
-                size={34}
-                className="mx-auto text-slate-300"
-              />
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <BriefcaseBusiness
+                  size={28}
+                  className="text-slate-400"
+                />
+              </span>
 
               <h3 className="mt-4 font-bold text-slate-700">
                 No jobs found
               </h3>
 
-              <p className="mt-1 text-sm text-slate-400">
-                Create your first job posting to
-                start receiving applications.
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
+                {searchQuery
+                  ? "Try changing your search or filters."
+                  : "Create your first job posting to start receiving applications."}
               </p>
+
+              {!searchQuery &&
+                !companyLoading &&
+                company?._id && (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-[#0066b3] px-4 text-sm font-semibold text-white hover:bg-[#005596]"
+                  >
+                    <Plus size={16} />
+
+                    Create first job
+                  </button>
+                )}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -753,9 +1014,13 @@ export default function ManageJobs() {
                 return (
                   <article
                     key={job.id}
-                    className="p-5 transition hover:bg-slate-50/60 sm:p-6"
+                    className="p-5 transition hover:bg-slate-50/70 sm:p-6"
                   >
                     <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                      {/* ---------------------------------
+                          JOB INFORMATION
+                      ---------------------------------- */}
+
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
                           <h3 className="text-lg font-bold text-[#172b4d]">
@@ -770,6 +1035,7 @@ export default function ManageJobs() {
                         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin size={15} />
+
                             {job.location ||
                               "Location not specified"}
                           </span>
@@ -815,15 +1081,33 @@ export default function ManageJobs() {
                               {salary}
                             </span>
                           )}
+
+                          {Number(
+                            job.applicants,
+                          ) > 0 && (
+                            <span className="inline-flex items-center gap-1 font-semibold text-slate-500">
+                              <Users size={13} />
+
+                              {Number(
+                                job.applicants,
+                              )}{" "}
+                              applicants
+                            </span>
+                          )}
                         </div>
                       </div>
+
+                      {/* ---------------------------------
+                          ACTIONS
+                      ---------------------------------- */}
 
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           to={`/recruiter/applicants?job=${job.id}`}
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#0066b3]"
                         >
                           <Users size={16} />
+
                           Applicants
                         </Link>
 
@@ -832,9 +1116,10 @@ export default function ManageJobs() {
                           onClick={() =>
                             openEditModal(job)
                           }
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#0066b3]"
                         >
                           <Edit3 size={16} />
+
                           Edit
                         </button>
 
@@ -846,11 +1131,13 @@ export default function ManageJobs() {
                           onClick={() =>
                             toggleJobStatus(job)
                           }
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                         >
-                          {job.status === "OPEN"
-                            ? "Close"
-                            : "Reopen"}
+                          {actionId === job.id
+                            ? "Saving..."
+                            : job.status === "OPEN"
+                              ? "Close"
+                              : "Reopen"}
                         </button>
 
                         <button
@@ -861,7 +1148,7 @@ export default function ManageJobs() {
                           onClick={() =>
                             handleDeleteJob(job)
                           }
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                           title="Delete job"
                         >
                           <Trash2 size={16} />
@@ -876,21 +1163,32 @@ export default function ManageJobs() {
         </section>
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* =================================================
+          CREATE / EDIT MODAL
+      ================================================= */}
+
       {modalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            {/* -------------------------------------------
+                MODAL HEADER
+            -------------------------------------------- */}
+
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
               <div>
-                <h2 className="text-lg font-bold text-[#172b4d]">
+                <p className="text-xs font-bold tracking-[0.16em] text-[#0066b3]">
+                  JOB POSTING
+                </p>
+
+                <h2 className="mt-1 text-lg font-bold text-[#172b4d]">
                   {editingJobId
                     ? "Edit job posting"
                     : "Create job posting"}
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  This information will be visible to
-                  job seekers.
+                  This information will be visible
+                  to job seekers.
                 </p>
               </div>
 
@@ -899,23 +1197,65 @@ export default function ManageJobs() {
                 onClick={() =>
                   setModalOpen(false)
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
               >
                 <X size={18} />
               </button>
             </div>
+
+            {/* -------------------------------------------
+                FORM
+            -------------------------------------------- */}
 
             <form
               onSubmit={handleSubmit}
               className="space-y-5 p-5 sm:p-6"
             >
               {formError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium leading-5 text-red-700">
                   {formError}
                 </div>
               )}
 
+              {/* -----------------------------------------
+                  COMPANY
+              ------------------------------------------ */}
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">
+                  Company
+                </label>
+
+                {companyLoading ? (
+                  <div className="mt-2 flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-400">
+                    Loading company profile...
+                  </div>
+                ) : company?._id ? (
+                  <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {company.name}
+                    </p>
+
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      This company will be automatically
+                      attached to the job.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-800">
+                    Company profile not found. Please
+                    create your company profile first.
+                  </div>
+                )}
+              </div>
+
+              {/* -----------------------------------------
+                  FIELDS
+              ------------------------------------------ */}
+
               <div className="grid gap-5 sm:grid-cols-2">
+                {/* JOB TITLE */}
+
                 <label className="sm:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">
                     Job title
@@ -926,9 +1266,11 @@ export default function ManageJobs() {
                     value={form.title}
                     onChange={updateField}
                     placeholder="e.g. Backend Developer"
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
                 </label>
+
+                {/* LOCATION */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -940,9 +1282,11 @@ export default function ManageJobs() {
                     value={form.location}
                     onChange={updateField}
                     placeholder="e.g. Gurugram, Haryana"
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
                 </label>
+
+                {/* EMPLOYMENT TYPE */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -953,25 +1297,31 @@ export default function ManageJobs() {
                     name="employmentType"
                     value={form.employmentType}
                     onChange={updateField}
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   >
                     <option value="FULL_TIME">
                       Full-time
                     </option>
+
                     <option value="PART_TIME">
                       Part-time
                     </option>
+
                     <option value="CONTRACT">
                       Contract
                     </option>
+
                     <option value="INTERNSHIP">
                       Internship
                     </option>
+
                     <option value="FREELANCE">
                       Freelance
                     </option>
                   </select>
                 </label>
+
+                {/* WORKPLACE */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -982,19 +1332,24 @@ export default function ManageJobs() {
                     name="workplaceType"
                     value={form.workplaceType}
                     onChange={updateField}
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   >
-                    <option value="ON_SITE">
+                    {/* IMPORTANT: backend value is ONSITE */}
+                    <option value="ONSITE">
                       On-site
                     </option>
+
                     <option value="HYBRID">
                       Hybrid
                     </option>
+
                     <option value="REMOTE">
                       Remote
                     </option>
                   </select>
                 </label>
+
+                {/* EXPERIENCE */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -1005,25 +1360,29 @@ export default function ManageJobs() {
                     name="experienceLevel"
                     value={form.experienceLevel}
                     onChange={updateField}
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   >
+                    {/* Backend-supported values */}
+
+                    <option value="FRESHER">
+                      Fresher
+                    </option>
+
                     <option value="ENTRY_LEVEL">
                       Entry level
                     </option>
+
                     <option value="MID_LEVEL">
                       Mid level
                     </option>
-                    <option value="SENIOR_LEVEL">
-                      Senior level
-                    </option>
-                    <option value="LEAD">
-                      Lead
-                    </option>
-                    <option value="MANAGER">
-                      Manager
+
+                    <option value="SENIOR">
+                      Senior
                     </option>
                   </select>
                 </label>
+
+                {/* MINIMUM SALARY */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -1037,9 +1396,11 @@ export default function ManageJobs() {
                     value={form.salaryMin}
                     onChange={updateField}
                     placeholder="400000"
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
                 </label>
+
+                {/* MAXIMUM SALARY */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -1053,9 +1414,11 @@ export default function ManageJobs() {
                     value={form.salaryMax}
                     onChange={updateField}
                     placeholder="700000"
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
                 </label>
+
+                {/* DEADLINE */}
 
                 <label>
                   <span className="text-sm font-semibold text-slate-700">
@@ -1065,11 +1428,18 @@ export default function ManageJobs() {
                   <input
                     type="date"
                     name="applicationDeadline"
-                    value={form.applicationDeadline}
+                    min={new Date()
+                      .toISOString()
+                      .slice(0, 10)}
+                    value={
+                      form.applicationDeadline
+                    }
                     onChange={updateField}
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
                 </label>
+
+                {/* SKILLS */}
 
                 <label className="sm:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">
@@ -1081,13 +1451,15 @@ export default function ManageJobs() {
                     value={form.skills}
                     onChange={updateField}
                     placeholder="Node.js, Express, MongoDB, React"
-                    className={inputClass}
+                    className={`${inputClass} mt-2`}
                   />
 
                   <span className="mt-1 block text-xs text-slate-400">
                     Separate skills with commas.
                   </span>
                 </label>
+
+                {/* REQUIREMENTS */}
 
                 <label className="sm:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">
@@ -1102,13 +1474,15 @@ export default function ManageJobs() {
                     placeholder={
                       "Bachelor's degree\nGood communication\nREST API experience"
                     }
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#0066b3] focus:ring-4 focus:ring-blue-50"
                   />
 
                   <span className="mt-1 block text-xs text-slate-400">
                     One requirement per line.
                   </span>
                 </label>
+
+                {/* DESCRIPTION */}
 
                 <label className="sm:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">
@@ -1121,10 +1495,18 @@ export default function ManageJobs() {
                     onChange={updateField}
                     rows={7}
                     placeholder="Describe the role, responsibilities and what the candidate will work on..."
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm leading-6 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#0066b3] focus:ring-4 focus:ring-blue-50"
                   />
+
+                  <span className="mt-1 block text-xs text-slate-400">
+                    Minimum 20 characters.
+                  </span>
                 </label>
               </div>
+
+              {/* -----------------------------------------
+                  FORM ACTIONS
+              ------------------------------------------ */}
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <button
@@ -1132,15 +1514,19 @@ export default function ManageJobs() {
                   onClick={() =>
                     setModalOpen(false)
                   }
-                  className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="h-11 rounded-xl bg-[#0066b3] px-6 text-sm font-bold text-white hover:bg-[#005596] disabled:opacity-50"
+                  disabled={
+                    submitting ||
+                    companyLoading ||
+                    !company?._id
+                  }
+                  className="h-11 rounded-xl bg-[#0066b3] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#005596] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting
                     ? "Saving..."
