@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   BriefcaseBusiness,
   Eye,
@@ -6,11 +7,13 @@ import {
   LockKeyhole,
   Mail,
 } from "lucide-react";
+
 import {
   Link,
   useLocation,
   useNavigate,
 } from "react-router-dom";
+
 import toast from "react-hot-toast";
 
 import { useAuth } from "../context/AuthContext";
@@ -118,7 +121,7 @@ export default function Login() {
       const isAllowed = allowedPrefixes.some(
         (prefix) =>
           requestedPath === prefix ||
-          requestedPath.startsWith(`${prefix}/`)
+          requestedPath.startsWith(`${prefix}/`),
       );
 
       if (isAllowed) {
@@ -147,7 +150,7 @@ export default function Login() {
       // REAL BACKEND LOGIN
       // ========================================
       //
-      // Backend only expects:
+      // Backend expects:
       // email
       // password
       //
@@ -162,12 +165,23 @@ export default function Login() {
       // ========================================
       // GET AUTHENTICATED USER
       // ========================================
+      //
+      // AuthContext.login() already returns
+      // the authenticated USER object directly.
+      //
+      // Example:
+      // {
+      //   _id: "...",
+      //   name: "...",
+      //   email: "...",
+      //   role: "JOB_SEEKER"
+      // }
+      //
 
-      const authenticatedUser =
-        response?.data?.user;
+      const authenticatedUser = response;
 
       const role = String(
-        authenticatedUser?.role || ""
+        authenticatedUser?.role || "",
       )
         .trim()
         .toUpperCase();
@@ -181,7 +195,7 @@ export default function Login() {
 
       if (!defaultPath) {
         toast.error(
-          "Your account role could not be verified."
+          "Your account role could not be verified.",
         );
 
         return;
@@ -200,7 +214,7 @@ export default function Login() {
         requestedPath || defaultPath,
         {
           replace: true,
-        }
+        },
       );
     } catch (error) {
       // ========================================
@@ -219,7 +233,7 @@ export default function Login() {
       ) {
         toast.error(
           validationErrors[0]?.message ||
-            "Please check your login details."
+            "Please check your login details.",
         );
 
         return;
@@ -228,7 +242,7 @@ export default function Login() {
       toast.error(
         backendMessage ||
           error?.message ||
-          "Unable to sign in. Please try again."
+          "Unable to sign in. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -239,6 +253,7 @@ export default function Login() {
     <main className="min-h-[calc(100vh-72px)] bg-[#f6f8fb] px-4 py-10 sm:py-12">
       <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_rgba(15,60,100,0.1)] lg:grid-cols-2">
         {/* Left promotional panel */}
+
         <section className="hidden bg-[#10243e] p-10 text-white lg:block">
           <div className="flex h-full flex-col justify-between">
             <div>
@@ -264,6 +279,7 @@ export default function Login() {
         </section>
 
         {/* Login form */}
+
         <section className="p-6 sm:p-10">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#0066b3]">
@@ -284,6 +300,7 @@ export default function Login() {
             className="mt-8 space-y-5"
           >
             {/* Email */}
+
             <div>
               <label
                 htmlFor="email"
@@ -313,6 +330,7 @@ export default function Login() {
             </div>
 
             {/* Password */}
+
             <div>
               <label
                 htmlFor="password"
@@ -352,7 +370,7 @@ export default function Login() {
                   }
                   onClick={() =>
                     setShowPassword(
-                      (value) => !value
+                      (value) => !value,
                     )
                   }
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0066b3]"
@@ -367,6 +385,7 @@ export default function Login() {
             </div>
 
             {/* Remember me and forgot password */}
+
             <div className="flex flex-wrap items-center justify-between gap-3">
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
                 <input
@@ -374,7 +393,7 @@ export default function Login() {
                   checked={rememberMe}
                   onChange={(event) =>
                     setRememberMe(
-                      event.target.checked
+                      event.target.checked,
                     )
                   }
                   className="h-4 w-4 rounded border-slate-300 accent-[#0066b3]"
@@ -392,6 +411,7 @@ export default function Login() {
             </div>
 
             {/* Submit */}
+
             <button
               type="submit"
               disabled={loading}

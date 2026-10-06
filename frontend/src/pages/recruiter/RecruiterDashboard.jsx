@@ -1,120 +1,64 @@
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
-  BarChart3,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   CheckCircle2,
-  Eye,
+  Loader2,
   Plus,
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 
-import DashboardLayout from "../../components/DashboardLayout";
-import {
-  readRecruiterData,
-  RECRUITER_STORAGE_KEYS,
-} from "../../utils/recruiterStorage";
+import { useAuth } from "../../context/AuthContext";
 
-const navItems = [
-  { label: "Dashboard", path: "/recruiter", icon: BarChart3 },
-  { label: "My Jobs", path: "/recruiter/jobs", icon: BriefcaseBusiness },
-  { label: "Applicants", path: "/recruiter/applicants", icon: Users },
-  { label: "Interviews", path: "/recruiter/interviews", icon: CalendarDays },
-  {
-    label: "Company Profile",
-    path: "/recruiter/company-profile",
-    icon: Building2,
-  },
-];
+import { getMyJobs } from "../../services/jobService";
+import { getJobApplications } from "../../services/applicationService";
+import { getRecruiterInterviews } from "../../services/interviewService";
+import { getMyCompany } from "../../services/companyService";
 
-const demoJobs = [
-  {
-    id: 1,
-    title: "Junior Backend Developer",
-    status: "Active",
-    applicants: 24,
-    openings: "2",
-    posted: "2026-10-01",
-  },
-  {
-    id: 2,
-    title: "MERN Stack Developer",
-    status: "Active",
-    applicants: 38,
-    openings: "3",
-    posted: "2026-09-28",
-  },
-  {
-    id: 3,
-    title: "Frontend Developer Intern",
-    status: "Closed",
-    applicants: 16,
-    openings: "2",
-    posted: "2026-09-20",
-  },
-];
-
-const demoApplicants = [
-  {
-    id: 1,
-    name: "Rahul Verma",
-    job: "Junior Backend Developer",
-    status: "Applied",
-  },
-  {
-    id: 2,
-    name: "Priya Sharma",
-    job: "MERN Stack Developer",
-    status: "Shortlisted",
-  },
-  {
-    id: 3,
-    name: "Aman Singh",
-    job: "Junior Backend Developer",
-    status: "Interview",
-  },
-  {
-    id: 4,
-    name: "Neha Gupta",
-    job: "Frontend Developer Intern",
-    status: "Rejected",
-  },
-  {
-    id: 5,
-    name: "Vikram Yadav",
-    job: "MERN Stack Developer",
-    status: "Applied",
-  },
-  {
-    id: 6,
-    name: "Ananya Mehta",
-    job: "Junior Backend Developer",
-    status: "Shortlisted",
-  },
-];
-
-function getRecruiterName() {
-  try {
-    const user = JSON.parse(
-      localStorage.getItem("job_portal_user") || "null",
-    );
-
-    return user?.name || "Recruiter";
-  } catch {
-    return "Recruiter";
-  }
+function getApiErrorMessage(error, fallback) {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    fallback
+  );
 }
 
-function StatCard({ label, value, icon: Icon, tone, helper }) {
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  helper,
+}) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02]">
-      <div className="flex items-start justify-between gap-3">
+    <article className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_35px_rgba(15,23,42,0.08)]">
+      <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-slate-50/70 blur-2xl" />
+
+      <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="text-sm font-medium text-slate-500">
+            {label}
+          </p>
 
           <p className="mt-3 text-3xl font-black tracking-tight text-[#172b4d]">
             {value.toLocaleString("en-IN")}
@@ -124,108 +68,288 @@ function StatCard({ label, value, icon: Icon, tone, helper }) {
         <span
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone}`}
         >
-          <Icon size={20} />
+          <Icon size={20} strokeWidth={2.2} />
         </span>
       </div>
 
-      <p className="mt-3 text-xs text-slate-400">{helper}</p>
+      <p className="relative mt-3 text-xs font-medium text-slate-400">
+        {helper}
+      </p>
     </article>
   );
 }
 
+function QuickAction({
+  to,
+  icon: Icon,
+  title,
+  description,
+  iconClassName,
+}) {
+  return (
+    <Link
+      to={to}
+      className="group flex min-w-0 items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_35px_rgba(15,23,42,0.07)]"
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}
+      >
+        <Icon size={21} strokeWidth={2.2} />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-extrabold text-[#172b4d] sm:text-base">
+          {title}
+        </span>
+
+        <span className="mt-1 block text-xs leading-5 text-slate-500 sm:text-sm">
+          {description}
+        </span>
+      </span>
+
+      <ArrowUpRight
+        size={18}
+        className="shrink-0 text-slate-300 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#0066b3]"
+      />
+    </Link>
+  );
+}
+
 export default function RecruiterDashboard() {
-  // Read the latest saved demo data when the dashboard mounts.
-  const [jobs] = useState(() =>
-    readRecruiterData(RECRUITER_STORAGE_KEYS.jobs, demoJobs),
-  );
+  const { user } = useAuth();
 
-  const [applicants] = useState(() =>
-    readRecruiterData(
-      RECRUITER_STORAGE_KEYS.applicants,
-      demoApplicants,
-    ),
-  );
+  const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [interviews, setInterviews] = useState([]);
+  const [company, setCompany] = useState(null);
 
-  const [company] = useState(() =>
-    readRecruiterData(RECRUITER_STORAGE_KEYS.companyProfile, null),
-  );
+  const [loading, setLoading] = useState(true);
 
-  const stats = useMemo(() => {
-    const activeJobs = jobs.filter(
-      (job) => job.status === "Active",
-    ).length;
+  useEffect(() => {
+    let mounted = true;
 
-    const shortlisted = applicants.filter(
-      (applicant) => applicant.status === "Shortlisted",
-    ).length;
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
 
-    const interviews = applicants.filter(
-      (applicant) => applicant.status === "Interview",
-    ).length;
+        const [
+          jobsResponse,
+          companyResponse,
+          interviewsResponse,
+        ] = await Promise.all([
+          getMyJobs({
+            page: 1,
+            limit: 100,
+          }),
 
-    return {
-      activeJobs,
-      applications: applicants.length,
-      shortlisted,
-      interviews,
-    };
-  }, [jobs, applicants]);
+          getMyCompany().catch(() => null),
 
-  const performance = useMemo(
-    () =>
-      jobs.map((job) => {
-        const jobApplicants = applicants.filter(
-          (applicant) => applicant.job === job.title,
+          getRecruiterInterviews({
+            page: 1,
+            limit: 100,
+          }).catch(() => ({
+            data: [],
+          })),
+        ]);
+
+        const backendJobs = Array.isArray(jobsResponse?.data)
+          ? jobsResponse.data
+          : [];
+
+        const backendInterviews = Array.isArray(
+          interviewsResponse?.data,
+        )
+          ? interviewsResponse.data
+          : [];
+
+        if (!mounted) return;
+
+        setJobs(backendJobs);
+        setInterviews(backendInterviews);
+
+        setCompany(
+          companyResponse?.data?.company ||
+            companyResponse?.data ||
+            null,
         );
 
-        return {
-          ...job,
-          applicationCount:
-            jobApplicants.length || Number(job.applicants) || 0,
-          shortlisted: jobApplicants.filter(
-            (applicant) => applicant.status === "Shortlisted",
-          ).length,
-          interviews: jobApplicants.filter(
-            (applicant) => applicant.status === "Interview",
-          ).length,
-          remaining: Math.max(0, Number(job.openings) || 0),
-        };
-      }),
-    [jobs, applicants],
-  );
+        const applicationResults = await Promise.all(
+          backendJobs.map(async (job) => {
+            const jobId = job?._id || job?.id;
 
-  return (
-    <DashboardLayout title="Recruiter Dashboard" navItems={navItems}>
-      <div className="mx-auto max-w-7xl space-y-7">
-        {/* Welcome section */}
-        <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-sm text-slate-500">
-              Welcome back, {getRecruiterName()}
-              {company?.name ? ` · ${company.name}` : ""}
-            </p>
+            if (!jobId) {
+              return [];
+            }
 
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-[#172b4d] sm:text-3xl">
-              Hiring overview
-            </h2>
+            try {
+              const response = await getJobApplications(jobId, {
+                page: 1,
+                limit: 100,
+              });
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Review your job listings, follow application progress and
-              keep your hiring activity organized.
-            </p>
+              return Array.isArray(response?.data)
+                ? response.data
+                : [];
+            } catch {
+              return [];
+            }
+          }),
+        );
+
+        if (mounted) {
+          setApplications(applicationResults.flat());
+        }
+      } catch (error) {
+        if (mounted) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Unable to load recruiter dashboard.",
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const stats = useMemo(() => {
+    return {
+      activeJobs: jobs.filter(
+        (job) => job.status === "OPEN",
+      ).length,
+
+      applications: applications.length,
+
+      shortlisted: applications.filter(
+        (application) =>
+          application.status === "SHORTLISTED",
+      ).length,
+
+      interviews: interviews.filter(
+        (interview) =>
+          interview.status === "SCHEDULED",
+      ).length,
+    };
+  }, [jobs, applications, interviews]);
+
+  const performance = useMemo(() => {
+    return jobs.slice(0, 8).map((job) => {
+      const jobId = String(job?._id || job?.id);
+
+      const jobApplications = applications.filter(
+        (application) =>
+          String(
+            application?.job?._id ||
+              application?.job?.id ||
+              application?.job,
+          ) === jobId,
+      );
+
+      return {
+        ...job,
+
+        applicationCount: jobApplications.length,
+
+        shortlisted: jobApplications.filter(
+          (application) =>
+            application.status === "SHORTLISTED",
+        ).length,
+
+        interviews: jobApplications.filter(
+          (application) =>
+            application.status === "REVIEWING",
+        ).length,
+      };
+    });
+  }, [jobs, applications]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[65vh] items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <Loader2
+              size={22}
+              className="animate-spin text-[#0066b3]"
+            />
           </div>
 
-          <Link
-            to="/recruiter/jobs"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0066b3] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#005596] focus:outline-none focus:ring-4 focus:ring-blue-100"
-          >
-            <Plus size={17} />
-            Post a Job
-          </Link>
+          <p className="text-sm font-semibold text-slate-500">
+            Loading recruiter dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full min-w-0 overflow-hidden">
+      <div className="mx-auto w-full max-w-[1440px] space-y-6 px-4 pb-8 sm:px-6 lg:px-8 xl:px-10">
+        {/* =========================================================
+            HERO / WELCOME
+        ========================================================== */}
+        <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.05)]">
+          <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-50/80 blur-3xl" />
+
+          <div className="absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-indigo-50/50 blur-3xl" />
+
+          <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-9">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-[#0066b3]">
+                  Recruiter workspace
+                </span>
+
+                {company?.name && (
+                  <span className="max-w-full truncate rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                    {company.name}
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-5 text-sm font-medium text-slate-500">
+                Welcome back,{" "}
+                <span className="font-bold text-slate-700">
+                  {user?.name || "Recruiter"}
+                </span>
+              </p>
+
+              <h2 className="mt-1 text-3xl font-black tracking-tight text-[#172b4d] sm:text-4xl">
+                Hiring overview
+              </h2>
+
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+                Manage your jobs, review candidates and
+                keep your hiring pipeline moving.
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <Link
+                to="/recruiter/jobs"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0066b3] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(0,102,179,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#005596] hover:shadow-[0_12px_25px_rgba(0,102,179,0.25)] sm:w-auto"
+              >
+                <Plus size={17} strokeWidth={2.5} />
+                Post a Job
+              </Link>
+            </div>
+          </div>
         </section>
 
-        {/* Recruitment statistics */}
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* =========================================================
+            STATISTICS
+        ========================================================== */}
+        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Active jobs"
             value={stats.activeJobs}
@@ -239,7 +363,7 @@ export default function RecruiterDashboard() {
             value={stats.applications}
             icon={Users}
             tone="bg-violet-50 text-violet-700"
-            helper="Applications in the current demo data"
+            helper="Candidates who applied"
           />
 
           <StatCard
@@ -247,215 +371,203 @@ export default function RecruiterDashboard() {
             value={stats.shortlisted}
             icon={CheckCircle2}
             tone="bg-emerald-50 text-emerald-700"
-            helper="Candidates moved to shortlist"
+            helper="Candidates moved forward"
           />
 
           <StatCard
-            label="Interviews"
+            label="Upcoming interviews"
             value={stats.interviews}
             icon={CalendarDays}
             tone="bg-amber-50 text-amber-700"
-            helper="Candidates marked for interview"
+            helper="Currently scheduled"
           />
         </section>
 
-        {/* Quick navigation */}
-        <section className="grid gap-4 lg:grid-cols-3">
-          <Link
-            to="/recruiter/jobs"
-            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm"
-          >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0066b3]">
-              <BriefcaseBusiness size={22} />
-            </span>
+        {/* =========================================================
+            QUICK ACTIONS
+        ========================================================== */}
+        <section>
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0066b3]">
+              Workspace
+            </p>
 
-            <span className="min-w-0 flex-1">
-              <span className="block font-extrabold text-[#172b4d]">
-                Manage jobs
-              </span>
+            <h3 className="mt-1 text-xl font-black tracking-tight text-[#172b4d]">
+              Quick actions
+            </h3>
+          </div>
 
-              <span className="mt-1 block text-sm text-slate-500">
-                Create, edit, close and remove postings.
-              </span>
-            </span>
-
-            <ArrowUpRight
-              size={19}
-              className="text-slate-400 transition group-hover:text-[#0066b3]"
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-3">
+            <QuickAction
+              to="/recruiter/jobs"
+              icon={BriefcaseBusiness}
+              title="Manage jobs"
+              description="Create, edit, close and remove postings."
+              iconClassName="bg-blue-50 text-[#0066b3]"
             />
-          </Link>
 
-          <Link
-            to="/recruiter/applicants"
-            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm"
-          >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
-              <Users size={22} />
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span className="block font-extrabold text-[#172b4d]">
-                Review applicants
-              </span>
-
-              <span className="mt-1 block text-sm text-slate-500">
-                Search candidates and update their status.
-              </span>
-            </span>
-
-            <ArrowUpRight
-              size={19}
-              className="text-slate-400 transition group-hover:text-[#0066b3]"
+            <QuickAction
+              to="/recruiter/applicants"
+              icon={Users}
+              title="Review applicants"
+              description="Search candidates and update application status."
+              iconClassName="bg-violet-50 text-violet-700"
             />
-          </Link>
 
-          <Link
-            to="/recruiter/company-profile"
-            className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm"
-          >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-              <Building2 size={22} />
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span className="block font-extrabold text-[#172b4d]">
-                Company profile
-              </span>
-
-              <span className="mt-1 block text-sm text-slate-500">
-                Maintain your employer information.
-              </span>
-            </span>
-
-            <ArrowUpRight
-              size={19}
-              className="text-slate-400 transition group-hover:text-[#0066b3]"
+            <QuickAction
+              to="/recruiter/company-profile"
+              icon={Building2}
+              title="Company profile"
+              description="Keep employer information updated."
+              iconClassName="bg-emerald-50 text-emerald-700"
             />
-          </Link>
+          </div>
         </section>
 
-        {/* Job performance table */}
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="flex flex-col gap-2 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div>
-              <h3 className="font-extrabold text-[#172b4d]">
-                Job performance
-              </h3>
+        {/* =========================================================
+            JOB PERFORMANCE
+        ========================================================== */}
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#0066b3]" />
+
+                <h3 className="font-black text-[#172b4d]">
+                  Job performance
+                </h3>
+              </div>
 
               <p className="mt-1 text-sm text-slate-500">
-                A summary based on the job and applicant data available
-                in this browser.
+                Live data from your jobs and applications.
               </p>
             </div>
 
             <Link
               to="/recruiter/jobs"
-              className="inline-flex items-center gap-1 text-sm font-bold text-[#0066b3] hover:underline"
+              className="inline-flex w-fit items-center gap-1 text-sm font-bold text-[#0066b3] transition hover:text-[#005596] hover:underline"
             >
               Manage jobs
               <ArrowUpRight size={15} />
             </Link>
           </div>
 
-          {performance.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left">
+          {performance.length === 0 ? (
+            <div className="px-6 py-14 text-center sm:px-10">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
+                <BriefcaseBusiness size={28} />
+              </div>
+
+              <p className="mt-4 font-bold text-slate-600">
+                No job postings yet
+              </p>
+
+              <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-400">
+                Create your first job posting to start
+                receiving applications.
+              </p>
+
+              <Link
+                to="/recruiter/jobs"
+                className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#0066b3] hover:underline"
+              >
+                Create your first job
+                <ArrowUpRight size={15} />
+              </Link>
+            </div>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70 text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-5 py-4 font-bold">Job</th>
-                    <th className="px-4 py-4 font-bold">Status</th>
-                    <th className="px-4 py-4 font-bold">Applications</th>
-                    <th className="px-4 py-4 font-bold">Shortlisted</th>
-                    <th className="px-4 py-4 font-bold">Interviews</th>
-                    <th className="px-4 py-4 font-bold">Openings</th>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="px-5 py-4">
+                      Job
+                    </th>
+
+                    <th className="px-4 py-4">
+                      Status
+                    </th>
+
+                    <th className="px-4 py-4">
+                      Applications
+                    </th>
+
+                    <th className="px-4 py-4">
+                      Shortlisted
+                    </th>
+
+                    <th className="px-4 py-4">
+                      Interviews
+                    </th>
+
+                    <th className="px-4 py-4">
+                      Posted
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
                   {performance.map((job) => (
                     <tr
-                      key={job.id}
-                      className="transition hover:bg-slate-50/70"
+                      key={job._id || job.id}
+                      className="transition-colors hover:bg-slate-50/70"
                     >
                       <td className="px-5 py-4">
-                        <p className="font-bold text-[#172b4d]">
-                          {job.title}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="max-w-[260px] truncate font-bold text-[#172b4d]">
+                            {job.title}
+                          </p>
 
-                        <p className="mt-1 text-xs text-slate-400">
-                          {job.posted
-                            ? `Posted ${job.posted}`
-                            : "Draft posting"}
-                        </p>
+                          <p className="mt-1 max-w-[260px] truncate text-xs text-slate-400">
+                            {job.location ||
+                              "Location not specified"}
+                          </p>
+                        </div>
                       </td>
 
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                            job.status === "Active"
+                          className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${
+                            job.status === "OPEN"
                               ? "bg-emerald-50 text-emerald-700"
                               : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          {job.status || "Active"}
+                          {job.status === "OPEN"
+                            ? "Open"
+                            : "Closed"}
                         </span>
                       </td>
 
-                      <td className="px-4 py-4 text-sm font-bold text-[#172b4d]">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Eye size={14} className="text-slate-400" />
+                      <td className="px-4 py-4">
+                        <span className="font-bold text-slate-700">
                           {job.applicationCount}
                         </span>
                       </td>
 
-                      <td className="px-4 py-4 text-sm font-semibold text-slate-700">
-                        {job.shortlisted}
+                      <td className="px-4 py-4">
+                        <span className="font-bold text-slate-700">
+                          {job.shortlisted}
+                        </span>
                       </td>
 
-                      <td className="px-4 py-4 text-sm font-semibold text-slate-700">
-                        {job.interviews}
+                      <td className="px-4 py-4">
+                        <span className="font-bold text-slate-700">
+                          {job.interviews}
+                        </span>
                       </td>
 
-                      <td className="px-4 py-4 text-sm font-semibold text-slate-700">
-                        {job.remaining}
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-500">
+                        {formatDate(job.createdAt)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="px-5 py-14 text-center">
-              <BriefcaseBusiness
-                className="mx-auto text-slate-300"
-                size={30}
-              />
-
-              <h4 className="mt-3 font-bold text-slate-800">
-                No job postings yet
-              </h4>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Create your first job to start building your hiring pipeline.
-              </p>
-
-              <Link
-                to="/recruiter/jobs"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0066b3] px-4 py-2.5 text-sm font-bold text-white"
-              >
-                <Plus size={16} />
-                Post a job
-              </Link>
-            </div>
           )}
         </section>
-
-        <p className="text-xs leading-5 text-slate-400">
-          Demo limitation: recruiter data is stored in this browser only.
-          Real multi-user hiring, applicant privacy and cross-device syncing
-          require backend APIs and server-side authorization.
-        </p>
       </div>
-    </DashboardLayout>
+    </div>
   );
 }
