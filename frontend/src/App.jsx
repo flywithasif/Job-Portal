@@ -15,8 +15,6 @@ import Companies from "./pages/public/Companies";
 import CareerAdvice from "./pages/public/CareerAdvice";
 
 import SeekerDashboard from "./pages/seeker/SeekerDashboard";
-import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
-import AdminDashboard from "./pages/admin/AdminDashboard";
 import Profile from "./pages/seeker/Profile";
 import SavedJobs from "./pages/seeker/SavedJobs";
 import AppliedJobs from "./pages/seeker/AppliedJobs";
@@ -24,9 +22,19 @@ import ApplicationDetails from "./pages/seeker/ApplicationDetails";
 import Notifications from "./pages/seeker/Notifications";
 import Interviews from "./pages/seeker/Interviews";
 
+import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 import ManageJobs from "./pages/recruiter/ManageJobs";
 import Applicants from "./pages/recruiter/Applicants";
 import CompanyProfile from "./pages/recruiter/CompanyProfile";
+
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/Users";
+import AdminCompanies from "./pages/admin/Companies";
+import AdminJobs from "./pages/admin/Jobs";
+import AdminApplications from "./pages/admin/Applications";
+import Moderation from "./pages/admin/Moderation";
+import AdminManagement from "./pages/admin/AdminManagement";
+import AdminSettings from "./pages/admin/Settings";
 
 import {
   Bookmark,
@@ -84,16 +92,66 @@ function SeekerLayout({ title, children }) {
   );
 }
 
+function RecruiterLayout({ title, children }) {
+  const recruiterNavItems = [
+    {
+      label: "Dashboard",
+      path: "/recruiter",
+      icon: BriefcaseBusiness,
+    },
+    {
+      label: "Manage Jobs",
+      path: "/recruiter/jobs",
+      icon: FileText,
+    },
+    {
+      label: "Applicants",
+      path: "/recruiter/applicants",
+      icon: Search,
+    },
+    {
+      label: "Company Profile",
+      path: "/recruiter/company-profile",
+      icon: BriefcaseBusiness,
+    },
+  ];
+
+  return (
+    <ProtectedRoute roles={["RECRUITER"]}>
+      <DashboardLayout title={title} navItems={recruiterNavItems}>
+        {children}
+      </DashboardLayout>
+    </ProtectedRoute>
+  );
+}
+
 function LegacyApplicationRedirect() {
   const { id } = useParams();
 
   return <Navigate to={`/dashboard/applications/${id}`} replace />;
 }
 
+function AdminRoute({ children }) {
+  return (
+    <ProtectedRoute roles={["ADMIN", "SUPER_ADMIN"]}>
+      {children}
+    </ProtectedRoute>
+  );
+}
+
+function SuperAdminRoute({ children }) {
+  return (
+    <ProtectedRoute roles={["SUPER_ADMIN"]}>
+      {children}
+    </ProtectedRoute>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
-      {/* Public Pages */}
+      {/* ==================== PUBLIC ==================== */}
+
       <Route
         path="/"
         element={
@@ -166,7 +224,8 @@ export default function App() {
         }
       />
 
-      {/* Job Seeker Dashboard */}
+      {/* ==================== JOB SEEKER ==================== */}
+
       <Route
         path="/dashboard"
         element={
@@ -248,7 +307,8 @@ export default function App() {
         }
       />
 
-      {/* Old Seeker URLs */}
+      {/* ==================== LEGACY SEEKER URLS ==================== */}
+
       <Route
         path="/profile"
         element={<Navigate to="/dashboard/profile" replace />}
@@ -279,169 +339,122 @@ export default function App() {
         element={<Navigate to="/dashboard/interviews" replace />}
       />
 
-      {/* Recruiter Dashboard */}
+      {/* ==================== RECRUITER ==================== */}
+
       <Route
         path="/recruiter"
         element={
-          <ProtectedRoute allowedRoles={["RECRUITER"]}>
-            <DashboardLayout
-              title="Recruiter Dashboard"
-              navItems={[
-                {
-                  label: "Dashboard",
-                  path: "/recruiter",
-                  icon: BriefcaseBusiness,
-                },
-                {
-                  label: "Manage Jobs",
-                  path: "/recruiter/jobs",
-                  icon: FileText,
-                },
-                {
-                  label: "Applicants",
-                  path: "/recruiter/applicants",
-                  icon: Search,
-                },
-                {
-                  label: "Company Profile",
-                  path: "/recruiter/company-profile",
-                  icon: BriefcaseBusiness,
-                },
-              ]}
-            >
-              <RecruiterDashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
+          <RecruiterLayout title="Recruiter Dashboard">
+            <RecruiterDashboard />
+          </RecruiterLayout>
         }
       />
 
       <Route
         path="/recruiter/jobs"
         element={
-          <ProtectedRoute allowedRoles={["RECRUITER"]}>
-            <DashboardLayout
-              title="Manage Jobs"
-              navItems={[
-                {
-                  label: "Dashboard",
-                  path: "/recruiter",
-                  icon: BriefcaseBusiness,
-                },
-                {
-                  label: "Manage Jobs",
-                  path: "/recruiter/jobs",
-                  icon: FileText,
-                },
-                {
-                  label: "Applicants",
-                  path: "/recruiter/applicants",
-                  icon: Search,
-                },
-                {
-                  label: "Company Profile",
-                  path: "/recruiter/company-profile",
-                  icon: BriefcaseBusiness,
-                },
-              ]}
-            >
-              <ManageJobs />
-            </DashboardLayout>
-          </ProtectedRoute>
+          <RecruiterLayout title="Manage Jobs">
+            <ManageJobs />
+          </RecruiterLayout>
         }
       />
 
       <Route
         path="/recruiter/applicants"
         element={
-          <ProtectedRoute allowedRoles={["RECRUITER"]}>
-            <DashboardLayout
-              title="Applicants"
-              navItems={[
-                {
-                  label: "Dashboard",
-                  path: "/recruiter",
-                  icon: BriefcaseBusiness,
-                },
-                {
-                  label: "Manage Jobs",
-                  path: "/recruiter/jobs",
-                  icon: FileText,
-                },
-                {
-                  label: "Applicants",
-                  path: "/recruiter/applicants",
-                  icon: Search,
-                },
-                {
-                  label: "Company Profile",
-                  path: "/recruiter/company-profile",
-                  icon: BriefcaseBusiness,
-                },
-              ]}
-            >
-              <Applicants />
-            </DashboardLayout>
-          </ProtectedRoute>
+          <RecruiterLayout title="Applicants">
+            <Applicants />
+          </RecruiterLayout>
         }
       />
 
       <Route
         path="/recruiter/company-profile"
         element={
-          <ProtectedRoute allowedRoles={["RECRUITER"]}>
-            <DashboardLayout
-              title="Company Profile"
-              navItems={[
-                {
-                  label: "Dashboard",
-                  path: "/recruiter",
-                  icon: BriefcaseBusiness,
-                },
-                {
-                  label: "Manage Jobs",
-                  path: "/recruiter/jobs",
-                  icon: FileText,
-                },
-                {
-                  label: "Applicants",
-                  path: "/recruiter/applicants",
-                  icon: Search,
-                },
-                {
-                  label: "Company Profile",
-                  path: "/recruiter/company-profile",
-                  icon: BriefcaseBusiness,
-                },
-              ]}
-            >
-              <CompanyProfile />
-            </DashboardLayout>
-          </ProtectedRoute>
+          <RecruiterLayout title="Company Profile">
+            <CompanyProfile />
+          </RecruiterLayout>
         }
       />
 
-      {/* Admin Dashboard */}
+      {/* ==================== ADMIN ==================== */}
+
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
-            <DashboardLayout
-              title="Admin Dashboard"
-              navItems={[
-                {
-                  label: "Dashboard",
-                  path: "/admin",
-                  icon: BriefcaseBusiness,
-                },
-              ]}
-            >
-              <AdminDashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
+          <AdminRoute>
+            <AdminDashboard />
+          </AdminRoute>
         }
       />
 
-      {/* 404 */}
+      <Route
+        path="/admin/users"
+        element={
+          <AdminRoute>
+            <AdminUsers />
+          </AdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/companies"
+        element={
+          <AdminRoute>
+            <AdminCompanies />
+          </AdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/jobs"
+        element={
+          <AdminRoute>
+            <AdminJobs />
+          </AdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/applications"
+        element={
+          <AdminRoute>
+            <AdminApplications />
+          </AdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/moderation"
+        element={
+          <AdminRoute>
+            <Moderation />
+          </AdminRoute>
+        }
+      />
+
+      {/* SUPER ADMIN ONLY */}
+
+      <Route
+        path="/admin/admins"
+        element={
+          <SuperAdminRoute>
+            <AdminManagement />
+          </SuperAdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/settings"
+        element={
+          <AdminRoute>
+            <AdminSettings />
+          </AdminRoute>
+        }
+      />
+
+      {/* ==================== 404 ==================== */}
+
       <Route
         path="*"
         element={<Navigate to="/" replace />}
